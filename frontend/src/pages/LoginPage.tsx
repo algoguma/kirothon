@@ -3,7 +3,6 @@ import { Navigate, useNavigate } from 'react-router'
 import { api, ApiError, useMock, type MeResponse } from '../api'
 import { errorMessage } from '../api/errors'
 import { useAuth } from '../auth/context'
-import { Brand } from '../brand'
 
 type Step = 'phone' | 'code' | 'password'
 
@@ -92,7 +91,7 @@ export default function LoginPage() {
 
   return (
     <main className="card">
-      <Brand />
+      <img className="card-logo" src="/favicon.svg" alt="" width={64} height={64} />
       <h1>텔레그램 로그인</h1>
 
       {step === 'phone' && (

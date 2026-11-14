@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router'
 import { api, type LlmSettings } from '../api'
 import { errorMessage } from '../api/errors'
 import { useAuth } from '../auth/context'
-import { Brand } from '../brand'
 
 // Spec 8 /setup: one API key field. The backend verifies the key before saving.
 export default function SetupPage() {
@@ -36,7 +35,7 @@ export default function SetupPage() {
 
   return (
     <main className="card">
-      <Brand />
+      <img className="card-logo" src="/favicon.svg" alt="" width={64} height={64} />
       <h1>LLM 연결 설정</h1>
       <p className="muted">GPU 서버 담당자에게 받은 API 키를 입력하세요. 저장할 때 연결을 확인합니다.</p>
       {llm && (
