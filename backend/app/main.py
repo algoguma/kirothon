@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from app.api.auth import router as auth_router
 from app.api.chats import router as chats_router
 from app.api.me import router as me_router
+from app.api.sessions import router as sessions_router
 from app.crypto import check_key
 from app.db import init_db
 from app.errors import register_error_handlers
@@ -28,6 +29,7 @@ register_error_handlers(app)
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(chats_router)
+app.include_router(sessions_router)
 
 
 @app.get("/api/health")

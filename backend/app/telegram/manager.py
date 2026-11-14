@@ -73,6 +73,10 @@ class ClientManager:
         if client is not None:
             await client.disconnect()
 
+    def find(self, user_id: int) -> TelegramClient | None:
+        client = self._clients.get(user_id)
+        return client if client is not None and client.is_connected() else None
+
     def get(self, user_id: int) -> TelegramClient:
         client = self._clients.get(user_id)
         if client is None or not client.is_connected():
