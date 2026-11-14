@@ -29,7 +29,7 @@
   <text x="370" y="142" class="hd">🖥 Frontend</text>
   <text x="370" y="172" class="t">React + Vite + TS</text>
   <text x="370" y="196" class="t">localhost:5173</text>
-  <text x="370" y="220" class="s">메인 · 로그인 · 채팅방(목록·기록) · 설정</text>
+  <text x="370" y="220" class="s">메인 · 로그인 · 채팅방·기록 · 설정</text>
   <text x="370" y="244" class="s">/api → Vite 프록시</text>
 
   <rect class="box" x="660" y="110" width="500" height="150"/>
