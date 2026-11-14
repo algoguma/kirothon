@@ -24,7 +24,8 @@ export function Header() {
               <NavLink to="/settings">설정</NavLink>
             </>
           )}
-          {state.status === 'anonymous' && pathname !== '/login' && (
+          {/* The landing page has its own login button; the login page needs none. */}
+          {state.status === 'anonymous' && pathname !== '/' && pathname !== '/login' && (
             <Link to="/login" className="button small">
               로그인
             </Link>
