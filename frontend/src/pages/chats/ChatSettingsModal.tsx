@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { api, type Chat } from '../../api'
 import { errorMessage } from '../../api/errors'
 
-const MIN_DELAY = 30
+const MIN_DELAY = 5
 const MAX_DELAY = 120
 
 interface Props {

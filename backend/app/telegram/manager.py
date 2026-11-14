@@ -49,7 +49,12 @@ class ClientManager:
     async def add_user(self, user_id: int, api_id: int, api_hash: str, session: str) -> None:
         if user_id in self._clients:
             await self.remove_user(user_id)
-        client = TelegramClient(StringSession(session), api_id, api_hash)
+        try:
+            # A corrupted saved session must not stop the whole backend from starting.
+            client = TelegramClient(StringSession(session), api_id, api_hash)
+        except ValueError:
+            logger.warning("Saved session for user %s is invalid; skipping", user_id)
+            return
         try:
             await client.connect()
             if not await client.is_user_authorized():

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Response
 from pydantic import BaseModel
 from sqlalchemy import case, func, select
 
+from app.api.chats import private_entity
 from app.api.deps import CurrentUser, DbSession
 from app.errors import ApiError
 from app.models import AutoReplySession, ChatSettings, Message, User, utc_now
@@ -49,7 +50,9 @@ def _not_found() -> ApiError:
 @router.get("/chats/{chat_id}/sessions")
 async def list_sessions(chat_id: int, user: CurrentUser, db: DbSession) -> list[SessionOut]:
     if await db.get(ChatSettings, (user.id, chat_id)) is None:
-        raise _not_found()
+        # Never toggled yet: an empty list if it is this user's 1:1 chat, otherwise 404.
+        await private_entity(client_manager.get(user.id), chat_id)
+        return []
     counts = (
         select(
             Message.session_id,
