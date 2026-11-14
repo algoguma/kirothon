@@ -1,6 +1,6 @@
 # 분신으로 자동답장
 
-<p align="center"><img src="docs/cover.png" alt="분신으로 자동답장" width="320"></p>
+<p align="center"><img src="docs/cover.png" alt="분신으로 자동답장" width="200"></p>
 
 > **데이트 준비 중에 여자친구 연락을 놓쳐서 서운하게 한 적, 바쁜 날 친구 메시지에 하루 늦게 답한 적, 운전 중이라 답장을 못 해서 "왜 읽고 답이 없어?"라는 말을 들어 본 적 있으신가요?**
 >
