@@ -4,7 +4,7 @@ inclusion: always
 
 # 보안 규칙
 
-- Telethon 세션 문자열은 계정 전체 권한과 같다. 세션과 LLM API 키는 Fernet으로 암호화해 저장하고, 로그·응답·예외 메시지·커밋에 원문을 남기지 않는다. API 키는 끝 4자리만 보여준다.
+- Telethon 세션 문자열은 계정 전체 권한과 같다. 세션, 사용자별 텔레그램 `api_hash`, LLM API 키는 Fernet으로 암호화해 저장하고, 로그·응답·예외 메시지·커밋에 원문을 남기지 않는다. LLM API 키는 끝 4자리만 보여주고, `api_hash`는 응답에 아예 내려주지 않는다.
 - `.env`, `*.session`, `*.db` 파일 내용을 읽어서 출력하지 않는다. 새 환경변수는 `backend/.env.example`에 빈 값으로 추가한다.
 - 백엔드는 `127.0.0.1`에만 바인딩한다.
 - 인증 코드 요청은 같은 전화번호당 1분에 1회로 제한하고, `FloodWaitError`는 `FLOOD_WAIT`(429, `retry_after_sec`)로 변환한다.
