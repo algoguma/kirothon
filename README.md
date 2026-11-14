@@ -19,4 +19,4 @@
 이 저장소는 Kiro 설정(`.kiro/`)을 공유한다. clone 후 저장소 루트에서 `kiro-cli`를 실행하면 `team` 에이전트와 `claude-opus-5.5` 모델이 자동으로 적용된다. 모델을 바꾸지 않는다.
 
 - PR 만들기: 세션에서 `/pr`
-- PR 리뷰: `kiro-cli --agent reviewer`
+- 머지 전 셀프 리뷰: `kiro-cli --agent reviewer`

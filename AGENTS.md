@@ -10,7 +10,7 @@
 | Backend | FastAPI, DB, 암호화, 웹 로그인, `ClientManager`, 채팅방·세션·추출 API, 자동 답장 디바운스 처리 | `backend/` (`backend/app/ai/` 제외) | `feature/be-` |
 | AI | `backend/app/ai/` 전체: 답장 생성, 프롬프트(기본 지침), 대화 기록 → 메시지 변환, 키 확인, vLLM 서버 연결과 운영 | `backend/app/ai/` | `feature/ai-` |
 
-- 자기 소유 경로 밖의 파일을 고쳐야 하면 PR에 해당 소유자를 리뷰어로 지정한다.
+- 자기 소유 경로 밖의 파일을 고쳐야 하면 머지 전에 해당 소유자에게 알린다.
 - 공유 파일(`docs/auto-reply-spec.md`, `backend/requirements.txt`, `frontend/package.json`, `.kiro/`)은 변경 이유를 PR 본문에 적는다.
 
 ## 역할 간 계약

@@ -21,7 +21,8 @@ inclusion: always
 ## PR
 - PR 전에 `git fetch origin` 후 `git rebase origin/main`. 충돌은 자기 브랜치에서 해결한다.
 - PR은 작게(변경 300줄 안팎), 제목은 커밋 형식과 같게 쓴다. 본문은 `.github/pull_request_template.md`를 채운다.
-- 승인 1명 이상 후 **Squash merge**. 리뷰 요청을 받으면 10분 안에 응답한다.
+- 리뷰 승인 없이 작성자가 직접 **Squash merge**한다. 머지 전에 `kiro-cli --agent reviewer`로 셀프 리뷰를 권장한다.
+- 다른 사람 소유 경로나 공유 파일을 바꾼 PR은 머지 전에 해당 소유자에게 알린다.
 - API 형식(명세 7장)이나 Backend↔AI 함수 시그니처를 바꾸는 PR은 `docs(spec)` PR로 먼저 머지하고 구현은 그다음에 한다.
 - `.kiro/`, `AGENTS.md` 변경은 기능 PR에 섞지 않고 `chore(kiro)` PR로 따로 올린다.
 

@@ -1,8 +1,0 @@
-# Owners are auto-requested as PR reviewers.
-# Roles are not assigned yet, so everyone owns everything.
-# Once roles are fixed, narrow these lines, e.g.:
-#   /frontend/        @<frontend-id>
-#   /backend/         @<backend-id>
-#   /backend/app/ai/  @<ai-id>
-
-*  @kinngife @neronkang @yhnoh8623

@@ -18,4 +18,4 @@ description: 현재 작업 브랜치를 main 기준으로 정리하고 push한 �
 7. PR 생성:
    - `gh`가 있으면 `gh pr create --base main --title "<커밋 형식 제목>" --body-file <임시 파일>`로 만든다. 본문은 `.github/pull_request_template.md`를 채운다.
    - `gh`가 없으면 `https://github.com/algoguma/kirothon/compare/main...<브랜치>?expand=1` 링크와 채운 본문을 출력한다.
-8. 변경한 영역의 소유자(AGENTS.md)를 리뷰어로 알려준다.
+8. 리뷰어는 지정하지 않는다. 다른 사람 소유 경로(AGENTS.md)나 공유 파일을 바꿨으면 알려야 할 소유자를 알려준다.
