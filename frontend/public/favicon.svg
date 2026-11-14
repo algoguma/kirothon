@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- "분신": a faded clone bubble behind the real one -->
-  <path d="M26 6h28a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8h-2v8l-10-8H26a8 8 0 0 1-8-8V14a8 8 0 0 1 8-8z" fill="#2481cc" opacity=".35"/>
-  <path d="M10 20h28a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H22l-10 8v-8h-2a8 8 0 0 1-8-8V28a8 8 0 0 1 8-8z" fill="#2481cc"/>
-  <circle cx="15" cy="37" r="3.5" fill="#fff"/>
-  <circle cx="24" cy="37" r="3.5" fill="#fff"/>
-  <circle cx="33" cy="37" r="3.5" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="#8247e5"/>
+  <g transform="translate(9 2.5) scale(0.48)">
+    <path fill="#fafafa" d="M50 8C78 8 92 30 92 58V92C92 104 84 110 76 106C72 114 62 116 56 108C50 116 38 116 34 106C26 112 16 108 16 98C10 100 4 96 6 90C12 86 14 80 14 72V46C14 24 28 8 50 8Z"/>
+    <ellipse cx="52" cy="40" rx="5.5" ry="8" fill="#111"/>
+    <ellipse cx="70" cy="40" rx="5.5" ry="8" fill="#111"/>
+  </g>
 </svg>

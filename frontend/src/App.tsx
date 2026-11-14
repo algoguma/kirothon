@@ -1,8 +1,8 @@
-import { BrowserRouter, NavLink, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
-import { useMock } from './api'
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
-import { Brand } from './brand'
+import { Header } from './components/Header'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
 
@@ -19,12 +19,10 @@ function SessionsPage() {
 function Layout() {
   return (
     <>
-      <nav className="nav">
-        <Brand />
-        <NavLink to="/chats">채팅방</NavLink>
-        <NavLink to="/settings">설정</NavLink>
-      </nav>
-      <Outlet />
+      <Header />
+      <div className="container">
+        <Outlet />
+      </div>
     </>
   )
 }
@@ -33,19 +31,18 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        {useMock && <div className="mock-badge">MOCK</div>}
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<RequireAuth />}>
-            <Route path="/setup" element={<SetupPage />} />
-            <Route element={<Layout />}>
-              <Route path="/" element={<Navigate to="/chats" replace />} />
+          <Route element={<Layout />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<RequireAuth />}>
+              <Route path="/setup" element={<SetupPage />} />
               <Route path="/chats" element={<Placeholder title="채팅방 목록" />} />
               <Route path="/chats/:chatId/sessions" element={<SessionsPage />} />
               <Route path="/settings" element={<Placeholder title="설정" />} />
             </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
