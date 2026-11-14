@@ -44,6 +44,7 @@ h1 {
 
 .nav {
   display: flex;
+  align-items: center;
   gap: 16px;
   margin-bottom: 24px;
   padding-bottom: 12px;
@@ -56,6 +57,20 @@ h1 {
 .nav a.active {
   color: var(--accent);
   font-weight: 600;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.nav .brand {
+  margin-right: auto;
+}
+.card .brand {
+  margin-bottom: 16px;
 }
 
 .card {

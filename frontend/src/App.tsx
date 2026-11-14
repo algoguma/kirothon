@@ -2,6 +2,7 @@ import { BrowserRouter, NavLink, Navigate, Outlet, Route, Routes, useParams } fr
 import { useMock } from './api'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
+import { Brand } from './brand'
 import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
 
@@ -19,6 +20,7 @@ function Layout() {
   return (
     <>
       <nav className="nav">
+        <Brand />
         <NavLink to="/chats">채팅방</NavLink>
         <NavLink to="/settings">설정</NavLink>
       </nav>
