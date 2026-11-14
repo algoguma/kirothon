@@ -1,59 +1,105 @@
-# kirothon
+# 분신으로 자동답장
 
-텔레그램 1:1 채팅방별 AI 자동 답장 서비스 (Kirothon 해커톤).
+> 내가 바쁠 때, 내 말투와 기억으로 대신 답하는 텔레그램 AI 분신 (Kirothon 해커톤)
 
-- 명세: [docs/auto-reply-spec.md](docs/auto-reply-spec.md)
-- 팀 역할과 작업 규칙: [AGENTS.md](AGENTS.md)
+관리자 페이지에서 내 텔레그램 계정으로 로그인하고, 1:1 채팅방마다 자동 답장을 켜고 끕니다. 켜진 채팅방에 상대가 메시지를 보내면, AI가 지금까지의 대화에서 익힌 **내 말투**와 **우리가 나눈 기억**으로 답장합니다. 상대가 아프다거나 내가 직접 정해야 하는 질문이 오면 나에게 따로 알려 줍니다.
 
-## 구성
+![프로젝트 플로우](docs/flow.svg)
 
-| 경로 | 내용 | 실행 |
-|---|---|---|
-| `frontend/` | React + Vite + TypeScript | `http://localhost:5173` |
-| `backend/` | Python FastAPI + Telethon | `http://127.0.0.1:8080` |
+## 주요 기능
+
+| 기능 | 설명 |
+|---|---|
+| 내 계정으로 로그인 | 각자 자기 텔레그램 `api_id`/`api_hash`와 전화번호, 인증 코드(2단계 인증 포함)로 로그인. 세션은 암호화해 저장 |
+| 채팅방별 ON/OFF | 1:1 채팅방 목록에서 토글. 대기 시간(5~120초), AI 지침, 실패 시 대체 문구를 채팅방마다 설정 |
+| 말투·기억 분석 | 켜는 순간 최근 대화 최대 1000개를 분석해 말투(호칭, 어미, 웃음, 줄임말)와 기억(약속, 있었던 일, 상대 정보)을 추출. 진행 상태를 화면에 표시 |
+| 자연스러운 답장 | 상대가 연달아 보내면 마지막 메시지 기준으로 한 번만 답장. 답장은 말풍선처럼 줄마다 나눠 전송. 기다리는 동안 내가 직접 답하면 AI는 양보 |
+| 주인 알림 | 비상상황(심각도 낮음/중간/높음)이나 기억에 없는 약속·결정 질문이면 "확인해보고 알려줄게"로 보류하고, 내 "저장된 메시지"로 알림 |
+| 기록 내려받기 | ON~OFF 구간을 세션으로 기록. 대화 미리 보기, JSON/CSV/TXT 다운로드. AI 답장은 구분 표시 |
+
+**예시**
+
+```
+기철: 근데 우리 토요일에 어디서 보기로 했지?
+나(AI): 강남역 순대국밥집 3시 ㄱ                      ← 기억에서 찾은 약속
+
+기철: 다음주 수요일 저녁에 우리 부모님이랑 밥 먹을 수 있어?
+나(AI): 확인해보고 알려줄게 ㅋㅋ                       ← 내가 정할 일은 보류
+[저장된 메시지] ❓ 확인이 필요해요 — 기철: "다음주 수요일 ..."
+```
+
+## 기술 스택
+
+| 영역 | 사용 |
+|---|---|
+| Frontend | React, Vite, TypeScript |
+| Backend | Python 3.11+, FastAPI, uvicorn, SQLAlchemy(async) + SQLite, Fernet 암호화 |
+| Telegram | Telethon (사용자 계정 MTProto, `StringSession`) |
+| AI | vLLM + Qwen3.8-27B (OpenAI 호환 API), GPU 서버에 SSH 터널로 접속 |
+
+## 구조
+
+```
+frontend/              React 화면 (로그인, 채팅방 목록, 세션 기록, 설정)
+backend/app/
+  api/                 auth, me, chats, sessions 라우터
+  telegram/            ClientManager, 자동 답장 디바운스, 말풍선 전송, 주인 알림
+  ai/                  generate_reply, 말투·기억 분석과 답장(persona/)
+  models.py, db.py, crypto.py
+prototype/             AI 담당의 말투·기억 프로토타입 (참조용)
+docs/auto-reply-spec.md  기능 명세 (API 계약 포함)
+```
+
+자세한 동작과 API 형식은 [기능 명세](docs/auto-reply-spec.md), 팀 역할과 작업 규칙은 [AGENTS.md](AGENTS.md)를 봅니다.
 
 ## 실행 (Windows PowerShell)
 
-필요: Python 3.11+, Node.js LTS. PowerShell에서 `npm`이 실행 정책 오류를 내면 `npm.cmd`로 실행한다.
+필요: Python 3.11+, Node.js LTS. PowerShell에서 `npm`이 실행 정책 오류를 내면 `npm.cmd`를 씁니다.
 
-**백엔드**
+**1. GPU 서버 터널** (실제 AI를 쓸 때, 별도 터미널에서 켜 둠)
+```powershell
+ssh -N -L 8000:localhost:8000 <user>@<GPU 서버>   # 비밀번호는 GPU 서버 담당자에게 받는다
+```
+
+**2. 백엔드** (`http://127.0.0.1:8080`)
 ```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
-Copy-Item .env.example .env        # 값 채우기. LLM_USE_STUB=true면 GPU 서버 없이 동작
-# ENCRYPTION_KEY는 필수. 아래 출력값을 .env의 ENCRYPTION_KEY=에 붙여 넣는다 (없으면 서버가 시작되지 않음)
+Copy-Item .env.example .env
+# ENCRYPTION_KEY 생성 후 .env에 붙여 넣기 (없으면 서버가 시작되지 않음)
 .venv\Scripts\python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 ```
-- 실제 GPU 서버를 쓰려면(`LLM_USE_STUB=false`) 별도 터미널에서 SSH 터널을 먼저 연다: `ssh -N -L 8000:localhost:8000 <user>@<GPU 서버>` (비밀번호는 GPU 서버 담당자에게 받는다). `.env`는 `LLM_BASE_URL=http://127.0.0.1:8000`. 그래서 백엔드는 `8080`을 쓴다.
-- 반드시 `backend` 폴더 안에서 실행한다. `.env`와 `kirothon.db`를 현재 폴더 기준으로 찾는다. 저장소 루트의 `.env`도 먼저 읽으므로(값이 겹치면 `backend/.env`가 우선), 프로토타입용 루트 `.env`의 `VLLM_BASE_URL`, `VLLM_MODEL`을 그대로 쓸 수 있다. 이때도 `ENCRYPTION_KEY`와 `LLM_USE_STUB=false`는 추가해야 한다.
-- 텔레그램 `api_id`/`api_hash`는 `.env`에 넣지 않는다. 로그인 화면에서 각자 자기 값을 입력한다 (https://my.telegram.org 에서 발급).
-- 구현된 API: 명세 7장 전체 (`/api/auth/*`, `/api/me`, `/api/chats`, `/api/chats/{id}/auto-reply`, `/api/chats/{id}/sessions`, `/api/sessions/{id}/messages`, `/api/sessions/{id}/export`).
-확인: http://127.0.0.1:8080/api/health, API 문서: http://127.0.0.1:8080/docs
-린트: `.venv\Scripts\ruff format .; .venv\Scripts\ruff check .`
+- `.env` 주요 값: `LLM_BASE_URL=http://127.0.0.1:8000`, `LLM_MODEL=qwen3.8-27b`, `LLM_USE_STUB=false`(GPU 없이 확인하려면 `true`)
+- 반드시 `backend` 폴더에서 실행합니다. 저장소 루트 `.env`도 먼저 읽으므로 프로토타입용 `VLLM_BASE_URL`, `VLLM_MODEL`을 그대로 써도 됩니다(`backend/.env`가 우선).
+- 텔레그램 `api_id`/`api_hash`는 `.env`에 넣지 않고 로그인 화면에서 입력합니다(https://my.telegram.org 에서 발급).
+- 확인: http://127.0.0.1:8080/api/health, API 문서: http://127.0.0.1:8080/docs · 린트: `.venv\Scripts\ruff check .`
 
-**프론트엔드**
+**3. 프론트엔드** (`http://localhost:5173`)
 ```powershell
 cd frontend
 npm.cmd install
-Copy-Item .env.example .env.local  # VITE_USE_MOCK=true면 mock 데이터, false면 백엔드 호출
+Copy-Item .env.example .env.local   # VITE_USE_MOCK=false면 실제 백엔드, true면 mock
 npm.cmd run dev
 ```
-`VITE_USE_MOCK` 값: `true`(전부 mock), `false`(전부 백엔드), 또는 mock으로 쓸 그룹 목록(`auth`, `chats`, `sessions`). 예를 들어 `VITE_USE_MOCK=chats,sessions`면 로그인은 실제 백엔드로, 나머지 화면은 mock으로 동작한다. 값을 바꾸면 백엔드를 먼저 띄운 뒤 `npm.cmd run dev`를 다시 실행한다.
-http://localhost:5173 , 린트와 빌드: `npm.cmd run lint`, `npm.cmd run build`
+- `VITE_USE_MOCK`은 `true`, `false`, 또는 mock으로 쓸 그룹 목록(`auth`, `chats`, `sessions`)입니다.
+- 린트와 빌드: `npm.cmd run lint`, `npm.cmd run build`
 
-## 역할별 시작 지점
+## 보안과 주의
 
-| 역할 | 시작 파일 |
+- 텔레그램 세션은 계정 전체 권한과 같습니다. 세션과 `api_hash`는 Fernet으로 암호화해 저장하고, 백엔드는 `127.0.0.1`에만 엽니다.
+- vLLM은 API 키 없이 GPU 서버의 `127.0.0.1`에만 열고, SSH 터널로만 접속합니다.
+- 자동 답장이 켜진 동안 대화 원문과 분석 결과가 `backend/data/`에 남습니다. `.gitignore`로 커밋에서 빠지고, 끄거나 로그아웃하면 지웁니다.
+- 자동 답장은 내가 켠 1:1 채팅방에서, 상대 메시지에 대한 응답으로만 보냅니다. 봇·그룹·채널에는 보내지 않습니다. 테스트와 시연은 팀원끼리 합니다.
+- PC가 꺼지거나 절전 모드에 들어가면 자동 답장도 멈춥니다(로컬 실행).
+
+## 팀
+
+| 역할 | 담당 |
 |---|---|
-| Frontend | `frontend/src/App.tsx`(라우트), `frontend/src/api/`(타입, mock) |
-| Backend | `backend/app/main.py`, `models.py`, `api/`, `telegram/` |
-| AI | `backend/app/ai/__init__.py`(계약 + stub). 구현은 `ai/` 아래 모듈로 나눠도 된다 |
+| Frontend | 화면 전체, mock 데이터, API 연동 (`frontend/`) |
+| Backend | 로그인, ClientManager, 채팅방·세션·추출 API, 자동 답장 (`backend/`) |
+| AI | 말투·기억 분석, 답장 프롬프트, 판단기, vLLM 서버 (`backend/app/ai/`, `prototype/`) |
 
-## Kiro 사용
-
-이 저장소는 Kiro 설정(`.kiro/`)을 공유한다. clone 후 저장소 루트에서 `kiro-cli`를 실행하면 `team` 에이전트와 `claude-opus-5.5` 모델이 자동으로 적용된다. 모델을 바꾸지 않는다.
-
-- PR 만들기: 세션에서 `/pr`
-- 머지 전 셀프 리뷰: `kiro-cli --agent reviewer`
+이 저장소는 Kiro 설정(`.kiro/`)을 공유합니다. 저장소 루트에서 `kiro-cli`를 실행하면 `team` 에이전트와 `claude-opus-5.5` 모델이 적용됩니다. PR은 `/pr`, 머지 전 셀프 리뷰는 `kiro-cli --agent reviewer`.
