@@ -21,6 +21,8 @@ const chats: Chat[] = [
     fallback_text: '나중에 연락드릴게요.',
     current_session_id: 7,
     last_error: null,
+    analysis_status: 'ready',
+    analysis_started_at: null,
   },
   {
     chat_id: 987654321,
@@ -32,6 +34,8 @@ const chats: Chat[] = [
     fallback_text: null,
     current_session_id: null,
     last_error: 'LLM 호출 시간 초과',
+    analysis_status: null,
+    analysis_started_at: null,
   },
 ]
 
@@ -120,6 +124,21 @@ function buildExport(sessionId: number, format: ExportFormat): DownloadedFile {
   return { filename, blob: new Blob([lines.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' }) }
 }
 
+// Mock analysis takes this long after turning on (real one: 30s~2min).
+const MOCK_ANALYSIS_MS = 20_000
+
+/** Finish mock analyses whose time is up. */
+function settleAnalysis(): void {
+  for (const chat of chats) {
+    if (chat.analysis_status === 'running' && chat.analysis_started_at) {
+      if (Date.now() - new Date(chat.analysis_started_at).getTime() >= MOCK_ANALYSIS_MS) {
+        chat.analysis_status = 'ready'
+        chat.analysis_started_at = null
+      }
+    }
+  }
+}
+
 function requireLogin() {
   // When auth goes to the real backend, the backend cookie decides; mock data is shared.
   if (isMocked('auth') && !loggedIn) throw new ApiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')
@@ -161,7 +180,8 @@ export const mockApi: Api = {
   async chats(q) {
     await delay()
     requireLogin()
-    return q ? chats.filter((c) => c.name.includes(q)) : [...chats]
+    settleAnalysis()
+    return (q ? chats.filter((c) => c.name.includes(q)) : chats).map((c) => ({ ...c }))
   },
   async updateAutoReply(chatId, body) {
     await delay()
@@ -182,13 +202,18 @@ export const mockApi: Api = {
       messages[id] = []
       chat.enabled = true
       chat.current_session_id = id
+      chat.analysis_status = 'running'
+      chat.analysis_started_at = new Date().toISOString()
     } else if (enabled === false && chat.enabled) {
       const open = sessions[chatId]?.find((s) => s.id === chat.current_session_id)
       if (open) open.ended_at = new Date().toISOString()
       chat.enabled = false
       chat.current_session_id = null
+      chat.analysis_status = null
+      chat.analysis_started_at = null
     }
     Object.assign(chat, rest)
+    settleAnalysis()
     return { ...chat }
   },
   async sessions(chatId) {

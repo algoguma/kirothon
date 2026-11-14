@@ -54,7 +54,12 @@ export interface Chat {
   fallback_text: string | null
   current_session_id: number | null
   last_error: string | null
+  /** Style/memory analysis while enabled (spec 7.3); null while off. */
+  analysis_status: AnalysisStatus | null
+  /** UTC; set only while analysis_status is "running". */
+  analysis_started_at: IsoDate | null
 }
+export type AnalysisStatus = 'running' | 'ready' | 'failed'
 export type AutoReplyUpdate = Partial<
   Pick<Chat, 'enabled' | 'reply_delay_sec' | 'ai_instructions' | 'fallback_text'>
 >

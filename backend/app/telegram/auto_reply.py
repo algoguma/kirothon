@@ -4,7 +4,9 @@ import asyncio
 import logging
 import shutil
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from sqlalchemy import update
 from sqlalchemy.dialects.sqlite import insert
@@ -21,7 +23,7 @@ from app.ai import (
 )
 from app.config import get_settings
 from app.db import SessionLocal
-from app.models import ChatSettings, Message
+from app.models import ChatSettings, Message, utc_now
 from app.telegram.entities import display_name, is_private_user, message_text
 from app.timeutil import as_utc
 
@@ -33,6 +35,7 @@ MAX_BUBBLES = 5  # a reply line becomes one Telegram message; cap to avoid spam
 BUBBLE_GAP_SEC = 1.2  # pause between bubbles so it reads like typing
 
 Key = tuple[int, int]  # (user_id, chat_id)
+AnalysisStatus = Literal["running", "ready", "failed"]
 
 
 def work_dir(user_id: int, chat_id: int) -> Path:
@@ -78,6 +81,7 @@ class AutoReplier:
         self._sent_ids: set[tuple[int, int, int]] = set()
         self._me: dict[int, str] = {}  # user_id -> own display name
         self._analysis: dict[Key, asyncio.Task[None]] = {}
+        self._analysis_started: dict[Key, datetime] = {}  # for the progress display
         self._bursting: set[Key] = set()  # chats whose reply bubbles are being sent
         self._interrupted: set[Key] = set()  # the user replied personally mid-burst
 
@@ -103,6 +107,8 @@ class AutoReplier:
             self.cancel(*key)
         for key in [k for k in self._analysis if k[0] == user_id]:
             self._analysis.pop(key).cancel()
+        for key in [k for k in self._analysis_started if k[0] == user_id]:
+            del self._analysis_started[key]
         self._me.pop(user_id, None)
         if drop_data:
             shutil.rmtree(Path(get_settings().data_dir) / str(user_id), ignore_errors=True)
@@ -112,7 +118,18 @@ class AutoReplier:
     def start_analysis(self, user_id: int, chat_id: int, client: TelegramClient) -> None:
         key = (user_id, chat_id)
         self.drop_analysis(user_id, chat_id)
+        self._analysis_started[key] = utc_now()
         self._analysis[key] = asyncio.create_task(self._analyze(key, client))
+
+    def analysis_status(self, user_id: int, chat_id: int) -> tuple[AnalysisStatus, datetime | None]:
+        """Spec 7.3 analysis_status / analysis_started_at for an enabled chat."""
+        key = (user_id, chat_id)
+        if key in self._analysis:
+            return "running", self._analysis_started.get(key)
+        if persona_ready(str(work_dir(*key))):
+            return "ready", None
+        # Failed, or never started (no live client): both reply with generate_reply.
+        return "failed", None
 
     def ensure_analysis(self, user_id: int, chat_id: int, client: TelegramClient) -> None:
         """After a restart: analyze again if the previous run did not finish."""
@@ -121,9 +138,11 @@ class AutoReplier:
             self.start_analysis(user_id, chat_id, client)
 
     def drop_analysis(self, user_id: int, chat_id: int) -> None:
-        task = self._analysis.pop((user_id, chat_id), None)
+        key = (user_id, chat_id)
+        task = self._analysis.pop(key, None)
         if task is not None:
             task.cancel()
+        self._analysis_started.pop(key, None)
         shutil.rmtree(work_dir(user_id, chat_id), ignore_errors=True)
 
     async def _analyze(self, key: Key, client: TelegramClient) -> None:
@@ -151,6 +170,7 @@ class AutoReplier:
         finally:
             if self._analysis.get(key) is asyncio.current_task():
                 del self._analysis[key]
+                self._analysis_started.pop(key, None)
 
     async def _on_incoming(
         self, user_id: int, client: TelegramClient, event: events.NewMessage.Event
@@ -206,6 +226,12 @@ class AutoReplier:
         user_id, chat_id = key
         try:
             await asyncio.sleep(row.reply_delay_sec)
+            # Spec 6.2: never answer before the style/memory analysis is done. Shield it so
+            # cancelling this reply (user answered, new message) does not stop the analysis.
+            analysis = self._analysis.get(key)
+            if analysis is not None:
+                logger.info("Reply for user %s waits for the analysis", user_id)
+                await asyncio.shield(analysis)
 
             error: str | None = None
             try:
@@ -220,7 +246,7 @@ class AutoReplier:
                     # Emergency / "owner must answer" notices show up in the chat list.
                     text, error = result.text, result.note
                 else:
-                    # Analysis still running or failed: spec 3.4 reply on the last 20 messages.
+                    # Analysis failed (spec 6.2): basic reply on the recent messages.
                     text = await generate_reply(history, row.ai_instructions)
             except LLMError as exc:
                 error = str(exc)

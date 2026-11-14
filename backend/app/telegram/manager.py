@@ -1,6 +1,7 @@
 """One live TelegramClient per logged-in user (spec 3.3) and the enabled-chat cache (spec 4)."""
 
 import logging
+from datetime import datetime
 
 from sqlalchemy import select
 from telethon import TelegramClient
@@ -10,7 +11,7 @@ from app.crypto import decrypt
 from app.db import SessionLocal
 from app.errors import ApiError
 from app.models import ChatSettings, User
-from app.telegram.auto_reply import AutoReplier
+from app.telegram.auto_reply import AnalysisStatus, AutoReplier
 from app.telegram.entities import display_name
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,14 @@ class ClientManager:
         client = self.find(user_id)
         if client is not None:
             self._auto.start_analysis(user_id, chat_id, client)
+
+    def analysis_status(
+        self, user_id: int, chat_id: int
+    ) -> tuple[AnalysisStatus | None, datetime | None]:
+        """(status, started_at) for spec 7.3; (None, None) while the chat is off."""
+        if self.session_for(user_id, chat_id) is None:
+            return None, None
+        return self._auto.analysis_status(user_id, chat_id)
 
     def session_for(self, user_id: int, chat_id: int) -> int | None:
         return self._enabled.get(user_id, {}).get(chat_id)
