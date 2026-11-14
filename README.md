@@ -27,7 +27,7 @@ Copy-Item .env.example .env        # 값 채우기. LLM_USE_STUB=true면 GPU 서
 .venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 ```
 - 실제 GPU 서버를 쓰려면(`LLM_USE_STUB=false`) 별도 터미널에서 SSH 터널을 먼저 연다: `ssh -N -L 8000:localhost:8000 <user>@<GPU 서버>` (비밀번호는 GPU 서버 담당자에게 받는다). `.env`는 `LLM_BASE_URL=http://127.0.0.1:8000`. 그래서 백엔드는 `8080`을 쓴다.
-- 반드시 `backend` 폴더 안에서 실행한다. `.env`와 `kirothon.db`를 현재 폴더 기준으로 찾는다.
+- 반드시 `backend` 폴더 안에서 실행한다. `.env`와 `kirothon.db`를 현재 폴더 기준으로 찾는다. 저장소 루트의 `.env`도 먼저 읽으므로(값이 겹치면 `backend/.env`가 우선), 프로토타입용 루트 `.env`의 `VLLM_BASE_URL`, `VLLM_MODEL`을 그대로 쓸 수 있다. 이때도 `ENCRYPTION_KEY`와 `LLM_USE_STUB=false`는 추가해야 한다.
 - 텔레그램 `api_id`/`api_hash`는 `.env`에 넣지 않는다. 로그인 화면에서 각자 자기 값을 입력한다 (https://my.telegram.org 에서 발급).
 - 구현된 API: 명세 7장 전체 (`/api/auth/*`, `/api/me`, `/api/chats`, `/api/chats/{id}/auto-reply`, `/api/chats/{id}/sessions`, `/api/sessions/{id}/messages`, `/api/sessions/{id}/export`).
 확인: http://127.0.0.1:8080/api/health, API 문서: http://127.0.0.1:8080/docs
