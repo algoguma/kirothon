@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type Chat } from '../../api'
 import { errorMessage } from '../../api/errors'
@@ -17,10 +17,17 @@ export default function ChatsPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [toggling, setToggling] = useState<Set<number>>(new Set())
   const [editing, setEditing] = useState<Chat | null>(null)
+  // Bumped whenever a write starts or finishes. A list fetched across a write is stale,
+  // so it is dropped instead of briefly undoing the user's change.
+  const writeSeq = useRef(0)
+  const pendingWrites = useRef(0)
 
   const load = useCallback(async (q: string) => {
+    const seq = writeSeq.current
     try {
-      setChats(await api.chats(q.trim() || undefined))
+      const list = await api.chats(q.trim() || undefined)
+      if (seq !== writeSeq.current || pendingWrites.current > 0) return
+      setChats(list)
       setLoadError(null)
     } catch (e) {
       setLoadError(errorMessage(e))
@@ -37,14 +44,29 @@ export default function ChatsPage() {
     }
   }, [query, load])
 
-  const replace = (updated: Chat) =>
-    setChats((list) => list?.map((c) => (c.chat_id === updated.chat_id ? updated : c)) ?? list)
+  const replace = useCallback(
+    (updated: Chat) =>
+      setChats((list) => list?.map((c) => (c.chat_id === updated.chat_id ? updated : c)) ?? list),
+    [],
+  )
+
+  /** Run a write; polls that overlap it are ignored. */
+  const write = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    writeSeq.current++
+    pendingWrites.current++
+    try {
+      return await fn()
+    } finally {
+      pendingWrites.current--
+      writeSeq.current++
+    }
+  }, [])
 
   const toggle = async (chat: Chat) => {
     setActionError(null)
     setToggling((s) => new Set(s).add(chat.chat_id))
     try {
-      replace(await api.updateAutoReply(chat.chat_id, { enabled: !chat.enabled }))
+      replace(await write(() => api.updateAutoReply(chat.chat_id, { enabled: !chat.enabled })))
     } catch (e) {
       setActionError(errorMessage(e))
     } finally {
@@ -55,6 +77,16 @@ export default function ChatsPage() {
       })
     }
   }
+
+  // Stable callbacks: the modal returns focus on cleanup, so these must not change per render.
+  const closeEditor = useCallback(() => setEditing(null), [])
+  const onSaved = useCallback(
+    (saved: Chat) => {
+      replace(saved)
+      setEditing(null)
+    },
+    [replace],
+  )
 
   const enabledCount = chats?.filter((c) => c.enabled).length ?? 0
 
@@ -100,10 +132,10 @@ export default function ChatsPage() {
                 마지막 대화 {formatKst(chat.last_message_at)}
                 {chat.enabled && ` · ${chat.reply_delay_sec}초 뒤 답장`}
               </div>
-              {chat.last_error && <div className="chat-error">⚠ {chat.last_error}</div>}
+              {chat.last_error && <div className="chat-error">⚠ 마지막 오류: {chat.last_error}</div>}
             </div>
             <div className="chat-actions">
-              <Link to={`/chats/${chat.chat_id}/sessions`} className="text-link">
+              <Link to={`/chats/${chat.chat_id}/sessions`} className="button secondary small">
                 기록
               </Link>
               <button type="button" className="secondary small" onClick={() => setEditing(chat)}>
@@ -128,11 +160,9 @@ export default function ChatsPage() {
       {editing && (
         <ChatSettingsModal
           chat={editing}
-          onClose={() => setEditing(null)}
-          onSaved={(saved) => {
-            replace(saved)
-            setEditing(null)
-          }}
+          save={(body) => write(() => api.updateAutoReply(editing.chat_id, body))}
+          onClose={closeEditor}
+          onSaved={onSaved}
         />
       )}
     </main>

@@ -438,9 +438,6 @@ input:focus {
   align-items: center;
   gap: 12px;
 }
-.text-link {
-  font-size: 14px;
-}
 @media (max-width: 520px) {
   .chat-row {
     flex-wrap: wrap;
@@ -569,10 +566,22 @@ textarea:focus {
 .small-inline {
   font-size: 12px;
 }
+.field-hint {
+  font-size: 12px;
+  color: var(--text);
+}
+a.button.secondary {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+a.button.secondary:hover {
+  background: var(--border);
+}
 
 /* ---- Settings ---- */
 .settings {
   max-width: 560px;
+  margin: 0 auto;
 }
 .panel {
   margin-bottom: 16px;
