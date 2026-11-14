@@ -80,7 +80,7 @@ async def list_chats(user: CurrentUser, db: DbSession, q: str | None = None) -> 
     return result
 
 
-async def _private_entity(client: TelegramClient, chat_id: int) -> TgUser:
+async def private_entity(client: TelegramClient, chat_id: int) -> TgUser:
     not_found = ApiError(404, "NOT_FOUND", "채팅방을 찾을 수 없습니다.")
     try:
         entity = await client.get_entity(chat_id)
@@ -118,7 +118,7 @@ async def update_auto_reply(
     chat_id: int, body: AutoReplyUpdate, user: CurrentUser, db: DbSession
 ) -> ChatOut:
     client = client_manager.get(user.id)
-    entity = await _private_entity(client, chat_id)
+    entity = await private_entity(client, chat_id)
     row = await db.get(ChatSettings, (user.id, chat_id))
     if row is None:
         row = ChatSettings(
