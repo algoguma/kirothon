@@ -35,7 +35,7 @@ class ChatOut(BaseModel):
 
 class AutoReplyUpdate(BaseModel):
     enabled: bool | None = None
-    reply_delay_sec: int | None = Field(default=None, ge=30, le=120)
+    reply_delay_sec: int | None = Field(default=None, ge=5, le=120)
     ai_instructions: str | None = Field(default=None, max_length=2000)
     fallback_text: str | None = Field(default=None, max_length=1000)
 

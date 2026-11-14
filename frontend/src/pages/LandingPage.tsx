@@ -5,7 +5,7 @@ import { Ghost } from '../components/Ghost'
 
 const FEATURES = [
   { title: '채팅방별로 켜고 끄기', body: '자동 답장을 원하는 1:1 채팅방만 골라서 켭니다.' },
-  { title: '내 말투로 답장', body: '30초~2분 뒤, 대화 내용을 보고 AI 분신이 대신 답합니다.' },
+  { title: '내 말투로 답장', body: '5초~2분 뒤, 대화 내용을 보고 AI 분신이 대신 답합니다.' },
   { title: '직접 답하면 양보', body: '기다리는 동안 내가 답하면 분신은 답장하지 않습니다.' },
   { title: '기록 내려받기', body: '자동 답장 구간의 대화를 JSON, CSV, TXT로 받습니다.' },
 ]

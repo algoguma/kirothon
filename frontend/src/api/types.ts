@@ -49,7 +49,7 @@ export interface Chat {
   name: string
   last_message_at: IsoDate | null
   enabled: boolean
-  reply_delay_sec: number // 30..120
+  reply_delay_sec: number // 5..120
   ai_instructions: string
   fallback_text: string | null
   current_session_id: number | null

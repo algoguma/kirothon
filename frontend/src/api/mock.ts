@@ -167,8 +167,8 @@ export const mockApi: Api = {
     await delay()
     requireLogin()
     const chat = findChat(chatId)
-    if (body.reply_delay_sec !== undefined && (body.reply_delay_sec < 30 || body.reply_delay_sec > 120)) {
-      throw new ApiError(422, 'VALIDATION_ERROR', '대기 시간은 30~120초입니다.')
+    if (body.reply_delay_sec !== undefined && (body.reply_delay_sec < 5 || body.reply_delay_sec > 120)) {
+      throw new ApiError(422, 'VALIDATION_ERROR', '대기 시간은 5~120초입니다.')
     }
     const { enabled, ...rest } = body
     // Spec 6.1 / 6.3: turning on opens a session, turning off closes it.
