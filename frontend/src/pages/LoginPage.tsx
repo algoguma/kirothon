@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
-import { api, ApiError, useMock, type MeResponse } from '../api'
+import { api, ApiError, isMocked, type MeResponse } from '../api'
 import { errorMessage } from '../api/errors'
 import { useAuth } from '../auth/context'
 
@@ -189,7 +189,7 @@ export default function LoginPage() {
           {error}
         </p>
       )}
-      {useMock && (
+      {isMocked('auth') && (
         <p className="muted small">
           MOCK: api_hash는 32자리 16진수면 통과, 코드는 아무거나 통과, 00000이면 2단계 인증 화면
         </p>

@@ -1,5 +1,6 @@
 // In-memory mock that follows spec 7. Extend freely while the backend is not ready.
 import { ApiError } from './http'
+import { isMocked } from './mockConfig'
 import type { Api } from './real'
 import type { AutoReplySession, Chat, LlmSettings, MeResponse, SessionMessage } from './types'
 
@@ -51,7 +52,8 @@ const messages: Record<number, SessionMessage[]> = {
 }
 
 function requireLogin() {
-  if (!loggedIn) throw new ApiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')
+  // When auth goes to the real backend, the backend cookie decides; mock data is shared.
+  if (isMocked('auth') && !loggedIn) throw new ApiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')
 }
 
 function findChat(chatId: number): Chat {
