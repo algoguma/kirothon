@@ -8,6 +8,6 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     // Same origin for the browser: no CORS, cookies just work (spec 4).
-    proxy: { '/api': 'http://127.0.0.1:8000' },
+    proxy: { '/api': 'http://127.0.0.1:8080' },
   },
 })

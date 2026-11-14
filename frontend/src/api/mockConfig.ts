@@ -1,8 +1,8 @@
 // VITE_USE_MOCK selects which API groups use src/api/mock.ts:
-//   true                -> all groups (default)
-//   false               -> none, everything calls the backend
-//   llm,chats,sessions  -> only these groups; the rest call the backend
-export const MOCK_GROUPS = ['auth', 'llm', 'chats', 'sessions'] as const
+//   true            -> all groups (default)
+//   false           -> none, everything calls the backend
+//   chats,sessions  -> only these groups; the rest call the backend
+export const MOCK_GROUPS = ['auth', 'chats', 'sessions'] as const
 export type MockGroup = (typeof MOCK_GROUPS)[number]
 
 function parse(raw: string | undefined): Set<MockGroup> {

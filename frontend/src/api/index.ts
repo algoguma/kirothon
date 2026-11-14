@@ -1,7 +1,7 @@
 // All API calls go through this module. Switch with VITE_USE_MOCK in frontend/.env.local
-// (see mockConfig.ts): "true", "false", or a list of groups such as "llm,chats,sessions".
+// (see mockConfig.ts): "true", "false", or a list of groups such as "chats,sessions".
 import { mockApi } from './mock'
-import { isMocked, mockedGroups, type MockGroup } from './mockConfig'
+import { isMocked, MOCK_GROUPS, mockedGroups, type MockGroup } from './mockConfig'
 import { realApi, type Api } from './real'
 
 const groupOf: Record<keyof Api, MockGroup> = {
@@ -10,8 +10,6 @@ const groupOf: Record<keyof Api, MockGroup> = {
   password: 'auth',
   logout: 'auth',
   me: 'auth',
-  getLlm: 'llm',
-  putLlm: 'llm',
   chats: 'chats',
   updateAutoReply: 'chats',
   sessions: 'sessions',
@@ -28,9 +26,9 @@ export const api = Object.fromEntries(
 
 /** True if any group is mocked (shows the MOCK badge). */
 export const useMock = mockedGroups.size > 0
-/** Badge text, e.g. "MOCK" or "MOCK: llm, chats, sessions". */
+/** Badge text, e.g. "MOCK" or "MOCK: chats, sessions". */
 export const mockLabel =
-  mockedGroups.size === 4 ? 'MOCK' : `MOCK: ${[...mockedGroups].join(', ')}`
+  mockedGroups.size === MOCK_GROUPS.length ? 'MOCK' : `MOCK: ${[...mockedGroups].join(', ')}`
 
 export { isMocked } from './mockConfig'
 export { ApiError } from './http'

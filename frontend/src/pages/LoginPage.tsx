@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   // Also handles the redirect right after a successful login (setMe re-renders this page).
   if (state.status === 'authenticated') {
-    return <Navigate to={state.me.llm_configured ? '/chats' : '/setup'} replace />
+    return <Navigate to="/chats" replace />
   }
 
   const done = (me: MeResponse) => setMe(me)

@@ -40,7 +40,7 @@ npm.cmd install
 Copy-Item .env.example .env.local  # VITE_USE_MOCK=true면 mock 데이터, false면 백엔드 호출
 npm.cmd run dev
 ```
-`VITE_USE_MOCK` 값: `true`(전부 mock), `false`(전부 백엔드), 또는 mock으로 쓸 그룹 목록(`auth`, `llm`, `chats`, `sessions`). 예를 들어 `VITE_USE_MOCK=llm,chats,sessions`면 로그인은 실제 백엔드로, 나머지 화면은 mock으로 동작한다. 값을 바꾸면 백엔드를 먼저 띄운 뒤 `npm.cmd run dev`를 다시 실행한다.
+`VITE_USE_MOCK` 값: `true`(전부 mock), `false`(전부 백엔드), 또는 mock으로 쓸 그룹 목록(`auth`, `chats`, `sessions`). 예를 들어 `VITE_USE_MOCK=chats,sessions`면 로그인은 실제 백엔드로, 나머지 화면은 mock으로 동작한다. 값을 바꾸면 백엔드를 먼저 띄운 뒤 `npm.cmd run dev`를 다시 실행한다.
 http://localhost:5173 , 린트와 빌드: `npm.cmd run lint`, `npm.cmd run build`
 
 ## 역할별 시작 지점

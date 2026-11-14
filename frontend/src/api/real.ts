@@ -4,7 +4,6 @@ import type {
   AutoReplyUpdate,
   Chat,
   ExportFormat,
-  LlmSettings,
   MeResponse,
   SendCodeRequest,
   SendCodeResponse,
@@ -20,8 +19,6 @@ export const realApi = {
   logout: () => request<void>('POST', '/auth/logout'),
 
   me: () => request<MeResponse>('GET', '/me'),
-  getLlm: () => request<LlmSettings>('GET', '/me/llm'),
-  putLlm: (api_key: string) => request<LlmSettings>('PUT', '/me/llm', { api_key }),
 
   chats: (q?: string) =>
     request<Chat[]>('GET', `/chats${q ? `?q=${encodeURIComponent(q)}` : ''}`),
