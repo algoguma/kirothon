@@ -12,7 +12,37 @@
 | `frontend/` | React + Vite + TypeScript | `http://localhost:5173` |
 | `backend/` | Python FastAPI + Telethon | `http://127.0.0.1:8000` |
 
-실행 방법은 각 프로젝트가 만들어지면 추가한다.
+## 실행 (Windows PowerShell)
+
+필요: Python 3.11+, Node.js LTS. PowerShell에서 `npm`이 실행 정책 오류를 내면 `npm.cmd`로 실행한다.
+
+**백엔드**
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+Copy-Item .env.example .env        # 값 채우기. LLM_USE_STUB=true면 GPU 서버 없이 동작
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+확인: http://127.0.0.1:8000/api/health, API 문서: http://127.0.0.1:8000/docs
+린트: `.venv\Scripts\ruff format .; .venv\Scripts\ruff check .`
+
+**프론트엔드**
+```powershell
+cd frontend
+npm.cmd install
+Copy-Item .env.example .env.local  # VITE_USE_MOCK=true면 mock 데이터, false면 백엔드 호출
+npm.cmd run dev
+```
+http://localhost:5173 , 린트와 빌드: `npm.cmd run lint`, `npm.cmd run build`
+
+## 역할별 시작 지점
+
+| 역할 | 시작 파일 |
+|---|---|
+| Frontend | `frontend/src/App.tsx`(라우트), `frontend/src/api/`(타입, mock) |
+| Backend | `backend/app/main.py`, `models.py`, `api/`, `telegram/` |
+| AI | `backend/app/ai/__init__.py`(계약 + stub). 구현은 `ai/` 아래 모듈로 나눠도 된다 |
 
 ## Kiro 사용
 
