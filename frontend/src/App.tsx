@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
 import { Header } from './components/Header'
+import ChatsPage from './pages/chats/ChatsPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
@@ -37,7 +38,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<RequireAuth />}>
               <Route path="/setup" element={<SetupPage />} />
-              <Route path="/chats" element={<Placeholder title="채팅방 목록" />} />
+              <Route path="/chats" element={<ChatsPage />} />
               <Route path="/chats/:chatId/sessions" element={<SessionsPage />} />
               <Route path="/settings" element={<Placeholder title="설정" />} />
             </Route>
