@@ -10,8 +10,6 @@ export type ErrorCode =
   | 'PASSWORD_REQUIRED'
   | 'INVALID_PASSWORD'
   | 'FLOOD_WAIT'
-  | 'LLM_NOT_CONFIGURED'
-  | 'LLM_TEST_FAILED'
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
 
@@ -40,20 +38,9 @@ export interface User {
   id: number
   display_name: string
 }
+// 7.1 sign-in / password response and 7.2 GET /api/me
 export interface MeResponse {
   user: User
-  llm_configured: boolean
-}
-
-// 7.2 LLM settings
-export interface LlmSettings {
-  model: string
-  api_key_set: boolean
-  api_key_hint: string | null
-  verified_at: IsoDate | null
-}
-export interface LlmSettingsUpdate {
-  api_key: string
 }
 
 // 7.3 Chats

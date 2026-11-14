@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { api, ApiError, type Chat } from '../../api'
+import { api, type Chat } from '../../api'
 import { errorMessage } from '../../api/errors'
 import { MockTag } from '../../components/MockTag'
 import { formatKst } from '../../format'
@@ -14,9 +14,7 @@ export default function ChatsPage() {
   const [chats, setChats] = useState<Chat[] | null>(null)
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<{ message: string; needsSetup: boolean } | null>(
-    null,
-  )
+  const [actionError, setActionError] = useState<string | null>(null)
   const [toggling, setToggling] = useState<Set<number>>(new Set())
   const [editing, setEditing] = useState<Chat | null>(null)
 
@@ -48,10 +46,7 @@ export default function ChatsPage() {
     try {
       replace(await api.updateAutoReply(chat.chat_id, { enabled: !chat.enabled }))
     } catch (e) {
-      setActionError({
-        message: errorMessage(e),
-        needsSetup: e instanceof ApiError && e.code === 'LLM_NOT_CONFIGURED',
-      })
+      setActionError(errorMessage(e))
     } finally {
       setToggling((s) => {
         const next = new Set(s)
@@ -82,13 +77,7 @@ export default function ChatsPage() {
 
       {actionError && (
         <p className="error" role="alert">
-          {actionError.message}
-          {actionError.needsSetup && (
-            <>
-              {' '}
-              <Link to="/setup">LLM 설정하러 가기</Link>
-            </>
-          )}
+          {actionError}
         </p>
       )}
       {loadError && (

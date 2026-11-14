@@ -8,7 +8,7 @@ export type AuthState =
 
 export interface AuthContextValue {
   state: AuthState
-  /** Set after sign-in / setup, or null after an explicit logout. */
+  /** Set after sign-in, or null after an explicit logout. */
   setMe: (me: MeResponse | null) => void
 }
 

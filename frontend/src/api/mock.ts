@@ -2,13 +2,12 @@
 import { ApiError } from './http'
 import { isMocked } from './mockConfig'
 import type { Api } from './real'
-import type { AutoReplySession, Chat, LlmSettings, MeResponse, SessionMessage } from './types'
+import type { AutoReplySession, Chat, MeResponse, SessionMessage } from './types'
 
 const delay = (ms = 200) => new Promise((r) => setTimeout(r, ms))
 
 let loggedIn = false
-let llm: LlmSettings = { model: 'mock-model', api_key_set: false, api_key_hint: null, verified_at: null }
-const me = (): MeResponse => ({ user: { id: 1, display_name: '홍길동' }, llm_configured: llm.api_key_set })
+const me = (): MeResponse => ({ user: { id: 1, display_name: '홍길동' } })
 
 const chats: Chat[] = [
   {
@@ -89,17 +88,6 @@ export const mockApi: Api = {
     requireLogin()
     return me()
   },
-  async getLlm() {
-    requireLogin()
-    return llm
-  },
-  async putLlm(apiKey) {
-    await delay(500)
-    requireLogin()
-    if (!apiKey) throw new ApiError(400, 'LLM_TEST_FAILED', 'API 키 확인에 실패했습니다.')
-    llm = { ...llm, api_key_set: true, api_key_hint: `...${apiKey.slice(-4)}`, verified_at: new Date().toISOString() }
-    return llm
-  },
   async chats(q) {
     await delay()
     requireLogin()
@@ -115,7 +103,6 @@ export const mockApi: Api = {
     const { enabled, ...rest } = body
     // Spec 6.1 / 6.3: turning on opens a session, turning off closes it.
     if (enabled === true && !chat.enabled) {
-      if (!llm.api_key_set) throw new ApiError(400, 'LLM_NOT_CONFIGURED', 'LLM 설정이 필요합니다.')
       const id = nextSessionId++
       ;(sessions[chatId] ??= []).unshift({
         id,

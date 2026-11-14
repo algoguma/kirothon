@@ -6,7 +6,6 @@ import ChatsPage from './pages/chats/ChatsPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
-import SetupPage from './pages/SetupPage'
 
 // Routes from spec section 8. Replace each placeholder with a page in src/pages/.
 function Placeholder({ title }: { title: string }) {
@@ -38,7 +37,6 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route element={<RequireAuth />}>
-              <Route path="/setup" element={<SetupPage />} />
               <Route path="/chats" element={<ChatsPage />} />
               <Route path="/chats/:chatId/sessions" element={<SessionsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
