@@ -72,20 +72,31 @@ vllm serve <모델> --served-model-name <모델 이름> --api-key <키> --host 0
 
 **"로그인하면 키 등록이 자동으로" 처리 방법**: 처음 로그인할 때 한 번만 키를 입력받는다. 백엔드는 `GET {LLM_BASE_URL}/v1/models`를 그 키로 호출해 키가 맞는지 확인한다. 이 요청은 답장을 생성하지 않아서 GPU를 쓰지 않는다. 확인되면 키를 텔레그램 계정에 묶어 저장한다. 이후에는 텔레그램으로 로그인만 하면 저장된 키가 자동으로 적용되므로 다시 입력할 일이 없다.
 
-**답장 생성**: `generate_reply(api_key, history, instructions) -> str` 하나로 감싼다. `openai` 파이썬 패키지에 `base_url=LLM_BASE_URL + "/v1"`을 지정해 그대로 쓸 수 있다.
+**Backend ↔ AI 계약**: AI 담당이 `backend/app/ai/__init__.py`에서 아래 두 함수만 노출하고, 백엔드는 이 함수만 호출한다(AGENTS.md). 내부에서는 `openai` 파이썬 패키지에 `base_url=LLM_BASE_URL + "/v1"`을 지정해 쓴다.
+
+```python
+async def generate_reply(api_key: str, history: list[ChatMessage], instructions: str) -> str
+    # 실패·시간 초과 시 LLMError를 던진다. 대체 문구 처리는 백엔드가 한다.
+async def verify_api_key(api_key: str) -> None
+    # GET {LLM_BASE_URL}/v1/models. 실패 시 LLMError.
+```
+
+`ChatMessage`는 `sender_name`, `text`, `date`, `is_outgoing`을 가진 dataclass다.
+
+**답장 생성 규칙** (`generate_reply` 내부, AI 담당):
 
 - **시스템 지침**: 기본 지침 + 사용자가 채팅방별로 적은 지침(예: "나는 지금 회의 중이라고 정중하게 안내해 줘")
   - 기본 지침: 사용자 본인처럼 자연스럽게 한국어로 짧게 답할 것, 약속·송금·개인정보 제공 같은 결정은 하지 말 것, 모르는 내용은 지어내지 말 것
 - **최근 대화**: 해당 채팅방의 최근 메시지 20개를 `user`(상대) / `assistant`(나) 역할로 넣는다.
 - **시간 초과**: 30초. GPU 서버가 꺼져 있거나 첫 요청이 느릴 수 있으므로 다른 API보다 넉넉히 잡는다.
-- **실패 처리**: 호출이 실패하거나 시간이 초과되면 채팅방에 설정된 대체 문구(예: "지금은 답장이 어려워요. 나중에 연락드릴게요.")를 보낸다. 대체 문구가 비어 있으면 답장하지 않는다. 실패 사실은 프론트에서 볼 수 있게 기록한다(`last_error`).
+- **실패 처리**: 호출이 실패하거나 시간이 초과되면 `generate_reply`는 `LLMError`를 던진다. 백엔드가 이를 받아 채팅방에 설정된 대체 문구(예: "지금은 답장이 어려워요. 나중에 연락드릴게요.")를 보낸다. 대체 문구가 비어 있으면 답장하지 않는다. 실패 사실은 프론트에서 볼 수 있게 기록한다(`last_error`).
 
 ### 3.5 기술 스택
 
 | 영역 | 선택 | 비고 |
 |---|---|---|
-| 프론트엔드 | React + Vite (TypeScript 권장) | `localhost:5173` |
-| 백엔드 | Python, FastAPI | `localhost:8000`. Telethon과 같은 asyncio 이벤트 루프에서 실행 |
+| 프론트엔드 | React + Vite + TypeScript (`strict`) | `localhost:5173` |
+| 백엔드 | Python 3.11+, FastAPI, uvicorn | `127.0.0.1:8000`. Telethon과 같은 asyncio 이벤트 루프에서 실행 |
 | 텔레그램 | Telethon (기존) + `StringSession` | |
 | LLM 호출 | `openai` 파이썬 패키지 (`base_url` 지정) | GPU 서버의 vLLM (OpenAI 호환 API) |
 | 저장소 | SQLite (SQLAlchemy 또는 aiosqlite) | 로컬 실행이라 파일 하나로 충분 |
@@ -100,7 +111,7 @@ vllm serve <모델> --served-model-name <모델 이름> --api-key <키> --host 0
 [React (Vite dev server)]
    │  /api/* 요청을 프록시
    ▼
-[FastAPI 백엔드 :8000] ─────────── [SQLite 파일]
+[FastAPI 백엔드 127.0.0.1:8000] ─────────── [SQLite 파일]
    │                                - 사용자, 암호화된 세션·API 키
    ▼                                - 채팅방 설정, 자동 답장 세션, 메시지 로그
 [ClientManager]
@@ -111,30 +122,30 @@ vllm serve <모델> --served-model-name <모델 이름> --api-key <키> --host 0
 [개인 클라우드 GPU 서버: vLLM (OpenAI 호환 API), 모든 사용자 공통]
 ```
 
-- **프론트 ↔ 백엔드 연결**: Vite 개발 서버의 `server.proxy`로 `/api`를 `http://localhost:8000`에 넘긴다. 브라우저 입장에서는 같은 주소라서 CORS 설정과 쿠키 문제가 없다.
+- **프론트 ↔ 백엔드 연결**: Vite 개발 서버의 `server.proxy`로 `/api`를 `http://127.0.0.1:8000`에 넘긴다. 브라우저 입장에서는 같은 주소라서 CORS 설정과 쿠키 문제가 없다. `localhost`로 적으면 Node 17 이상에서 IPv6(`::1`)로 먼저 연결해, `127.0.0.1`에만 바인딩한 백엔드에 닿지 못할 수 있다.
   ```ts
   // vite.config.ts
-  server: { proxy: { '/api': 'http://localhost:8000' } }
+  server: { proxy: { '/api': 'http://127.0.0.1:8000' } }
   ```
 - FastAPI `lifespan`에서 `ClientManager`를 시작하고, 저장된 세션으로 클라이언트들을 연결한다.
 - 켜진 채팅방은 메모리(`dict[user_id, set[chat_id]]`)에 캐시한다. 메시지마다 DB를 조회하지 않기 위해서다. 토글할 때 DB와 캐시를 함께 갱신한다.
 - **로컬 실행의 한계**: PC가 꺼지거나 절전 모드에 들어가면 자동 답장도 멈춘다. 시연 중에는 절전 모드를 끈다.
 
-### 저장소 구조 (제안)
+### 저장소 구조
 
 ```
 kirothon/
 ├─ backend/
 │  ├─ app/
-│  │  ├─ main.py            # FastAPI 앱, lifespan
-│  │  ├─ api/               # auth, me, chats, sessions 라우터
-│  │  ├─ telegram/          # ClientManager, 이벤트 핸들러
-│  │  ├─ llm.py             # generate_reply
-│  │  ├─ models.py, db.py
-│  │  └─ crypto.py          # Fernet 암복호화
+│  │  ├─ main.py            # FastAPI 앱, lifespan에서 ClientManager 시작   (Backend)
+│  │  ├─ api/               # auth, me, chats, sessions 라우터              (Backend)
+│  │  ├─ telegram/          # ClientManager, 이벤트 핸들러, 디바운스        (Backend)
+│  │  ├─ ai/                # generate_reply, verify_api_key, 프롬프트      (AI)
+│  │  ├─ models.py, db.py   #                                               (Backend)
+│  │  └─ crypto.py          # Fernet 암복호화                               (Backend)
 │  ├─ requirements.txt
 │  └─ .env.example
-├─ frontend/                # Vite + React
+├─ frontend/                # Vite + React + TypeScript                     (Frontend)
 └─ docs/auto-reply-spec.md
 ```
 
@@ -246,8 +257,14 @@ async def on_outgoing(user_id, event):
 
 async def reply_after_delay(user_id, chat_id):
     await asyncio.sleep(settings.reply_delay_sec)
-    history = load_recent_messages(user_id, chat_id, limit=20)
-    text = await generate_reply(api_key, history, settings.ai_instructions)  # 실패 시 fallback_text
+    history = load_recent_messages(user_id, chat_id, limit=20)   # list[ChatMessage]
+    try:
+        text = await generate_reply(api_key, history, settings.ai_instructions)
+    except LLMError as e:
+        save_last_error(user_id, chat_id, e)
+        if not settings.fallback_text:
+            return                               # 대체 문구가 없으면 답장하지 않음
+        text = settings.fallback_text
     sent = await client.send_message(chat_id, text)
     save_message(user_id, sent, is_auto_reply=True)
 ```
@@ -279,7 +296,7 @@ async def reply_after_delay(user_id, chat_id):
 
 ## 7. API 명세 (프론트 ↔ 백엔드 계약)
 
-프론트와 백엔드가 동시에 작업할 수 있도록 요청·응답 형식을 여기서 고정한다. 바꿀 때는 이 문서를 먼저 고친다. 백엔드가 준비되기 전에는 프론트가 이 형식으로 목(mock) 데이터를 만들어 개발한다. FastAPI가 자동 생성하는 `http://localhost:8000/docs`(OpenAPI)에서 실제 형식을 확인할 수 있다.
+프론트와 백엔드가 동시에 작업할 수 있도록 요청·응답 형식을 여기서 고정한다. 바꿀 때는 이 문서를 먼저 고친다. 백엔드가 준비되기 전에는 프론트가 이 형식으로 목(mock) 데이터를 만들어 개발한다. FastAPI가 자동 생성하는 `http://127.0.0.1:8000/docs`(OpenAPI)에서 실제 형식을 확인할 수 있다.
 
 ### 공통 규칙
 
@@ -410,7 +427,7 @@ async def reply_after_delay(user_id, chat_id):
 
 ## 9. 보안과 운영 주의사항
 
-- **Telethon 세션은 계정 전체 권한과 같다.** 유출되면 누구나 그 계정으로 메시지를 읽고 보낼 수 있다. 세션과 LLM API 키는 Fernet으로 암호화해 저장하고, 암호화 키(`ENCRYPTION_KEY`)는 `.env`에 DB와 분리해 둔다. `.gitignore`에는 이미 `.env`, `*.session`이 들어 있다. SQLite 파일(`*.db`)도 추가한다.
+- **Telethon 세션은 계정 전체 권한과 같다.** 유출되면 누구나 그 계정으로 메시지를 읽고 보낼 수 있다. 세션과 LLM API 키는 Fernet으로 암호화해 저장하고, 암호화 키(`ENCRYPTION_KEY`)는 `.env`에 DB와 분리해 둔다. `.gitignore`에는 이미 `.env`, `*.session`, `*.db`가 들어 있다.
 - **로컬에서만 연다.** 백엔드는 `127.0.0.1:8000`에만 바인딩한다(`uvicorn --host 127.0.0.1`). 같은 네트워크의 다른 기기에서 접속해야 하면 그때 HTTPS를 적용한다.
 - **GPU 서버 연결**: 로컬 백엔드에서 클라우드 GPU 서버로 가는 요청은 인터넷을 지나간다. vLLM은 반드시 `--api-key`를 켜고 실행해야 한다. 키 없이 띄우면 주소를 아는 누구나 GPU를 쓸 수 있다. vLLM 자체는 HTTPS를 제공하지 않으므로, 가능하면 앞에 nginx나 Caddy를 두어 HTTPS로 연결한다. 해커톤 중 HTTP로 쓴다면 키가 평문으로 오간다는 점을 알고 쓴다.
 - **사용자 간 데이터 분리**: 모든 조회에 `user_id` 조건을 건다. 남의 ID로 요청하면 404가 나오는지 확인한다.
@@ -440,7 +457,7 @@ API 키는 `.env`에 넣지 않는다. 사용자가 화면에서 입력한다.
 | 0 | 이 문서의 7장 API 형식 확정 (함께) | |
 | 1 | FastAPI 뼈대, DB 모델, Fernet 암호화 | Vite + React 프로젝트, 라우팅, 7장 형식의 목 데이터 |
 | 2 | 웹 로그인 (send-code / sign-in / password), `ClientManager` | 로그인 화면 3단계 |
-| 3 | `/me/llm` 저장과 테스트 호출 | `/setup` 화면 |
+| 3 | `/me/llm` 저장 (`verify_api_key` 호출) | `/setup` 화면 |
 | 4 | 채팅방 목록 (`send.py`의 `iter_dialogs` 재사용, `dialog.is_user`로 필터), on/off와 세션 생성·종료 | 채팅방 목록, 토글, 설정 모달 |
 | 5 | 지연 답장과 메시지 로그 (처음엔 고정 문구로 확인) → `generate_reply`에 GPU 서버 연결 | 오류 표시, 10초 주기 갱신 |
 | 6 | 세션 목록, 미리 보기, 추출 (JSON → CSV → TXT) | 세션 화면, 다운로드 |
