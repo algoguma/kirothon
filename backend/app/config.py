@@ -6,7 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Run from backend/: the repo-root .env is read first, backend/.env overrides it.
-    model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
+    # Empty values (e.g. copied from .env.example) are ignored so they do not hide the
+    # repo-root VLLM_* values.
+    model_config = SettingsConfigDict(
+        env_file=("../.env", ".env"), extra="ignore", env_ignore_empty=True
+    )
 
     # Telegram api_id/api_hash are entered per user at login (spec 3.2), not configured here.
     encryption_key: str = ""
