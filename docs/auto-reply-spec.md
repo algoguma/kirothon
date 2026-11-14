@@ -425,13 +425,15 @@ async def reply_after_delay(user_id, chat_id):
 
 | 경로 | 화면 | 사용하는 API |
 |---|---|---|
+| `/` | 메인(소개) 페이지: 캐릭터, 서비스 소개, "로그인" 버튼(`/login`으로 이동). 로그인 상태면 `/chats`로 이동 | `/me` |
 | `/login` | `api_id`·`api_hash`·전화번호 → 인증 코드 → (필요 시) 2FA 비밀번호, 한 페이지에서 단계 전환. 첫 단계에 my.telegram.org 발급 안내 링크 | `/auth/*` |
 | `/setup` | API 키 입력란 하나 + "저장" 버튼(저장 시 연결 확인). `llm_configured: false`면 로그인 직후 여기로 이동 | `/me/llm` |
 | `/chats` | 1:1 채팅방 목록: 이름, 마지막 대화 시각, on/off 토글, 설정 버튼(대기 시간 슬라이더 30~120초, AI 지침, 대체 문구), 오류 표시(`last_error`), 검색창 | `/chats` |
 | `/chats/:chatId/sessions` | 세션 목록(시작·종료 시각, 메시지 수, AI 답장 수), 대화 미리 보기, 형식별 다운로드 버튼 | `/chats/{id}/sessions`, `/sessions/*` |
 | `/settings` | LLM 설정 변경, 로그아웃 | `/me/llm`, `/auth/logout` |
 
-- 앱 시작 시 `GET /api/me`로 로그인 상태를 확인하고, 401이면 `/login`으로 보낸다.
+- 앱 시작 시 `GET /api/me`로 로그인 상태를 확인한다. 로그인이 필요한 화면에서 401이면 `/login`으로 보낸다.
+- 모든 화면 위에 로고와 서비스명("분신으로 자동답장")이 있는 고정 상단 바를 둔다.
 - 켜져 있는 채팅방의 답장 상태는 `/chats`를 10초마다 다시 불러와 갱신한다. 실시간 알림(WebSocket)은 해커톤 범위에서 제외한다.
 
 ## 9. 보안과 운영 주의사항
