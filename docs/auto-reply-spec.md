@@ -86,7 +86,9 @@ def persona_ready(work_dir: str) -> bool
     # style.md와 memory.md가 모두 있으면 True.
 async def generate_persona_reply(work_dir: str, history: list[ChatMessage], me: str, partner: str,
                                  instructions: str) -> PersonaReply
-    # 분석 결과로 답장. PersonaReply(text, note). note는 비상상황·주인 확인 안내(없으면 None). 실패 시 LLMError.
+    # 분석 결과로 답장. 실패 시 LLMError.
+    # PersonaReply(text, input, emergency: Emergency(severity, reason) | None, confirmation_question: str | None)
+    # prototype/run.py JSON의 reply / input / emergency / needs_confirmation과 같은 정보. note는 목록 표시용 한 줄 요약.
 ```
 
 `ChatMessage`는 `sender_name`, `text`, `date`, `is_outgoing`을 가진 dataclass다.
@@ -96,9 +98,17 @@ async def generate_persona_reply(work_dir: str, history: list[ChatMessage], me: 
 1. **켤 때**: 백엔드가 텔레그램에서 그 채팅방의 최근 메시지 최대 1000개를 가져와 `analyze_chat`을 백그라운드로 호출한다. `history.json`은 텔레그램 내보내기 형식(`{"messages": [{"type", "date", "from", "text"}]}`, 시각은 KST)이다. 분석은 최근 500개로 말투를, 1000개 전체로 약속·사건·상대 정보를 뽑으며 30초~2분 걸린다.
 2. **답장할 때**: 분석이 끝난 채팅방은 `generate_persona_reply`로, 분석이 실패한 채팅방은 `generate_reply`로 답한다. 분석 중이면 답장을 미뤘다가 분석이 끝난 뒤 답한다(6.2). 백엔드는 최근 메시지 160개를 넘기고, 상대가 마지막으로 보낸 메시지들을 새 메시지로, 그 앞의 최근 150개를 원문으로 프롬프트에 넣는다.
 3. **판단**: 답장 전에 한 번 더 호출해 비상상황과 "주인 확인 필요"를 판단한다.
-   - 주인 확인 필요(기억에 없는 약속·결정)면 "확인해보고 알려줄게" 같은 보류 답장만 보내고, 주인에게 물을 질문을 `note`로 돌려준다.
-   - 비상상황이면 진지한 톤으로 답하고 사유를 `note`로 돌려준다.
-   - 백엔드는 `note`를 `last_error`에 기록해 채팅방 목록에 보여 준다.
+   - 주인 확인 필요(기억에 없는 약속·결정)면 "확인해보고 알려줄게" 같은 보류 답장만 보내고, 주인에게 물을 질문을 `confirmation_question`으로 돌려준다.
+   - 비상상황이면 진지한 톤으로 답하고 심각도·사유를 `emergency`로 돌려준다.
+   - 백엔드는 요약(`note`)을 `last_error`에 기록해 채팅방 목록에 보여 준다.
+   - **주인 알림**: 둘 중 하나라도 해당하면 답장을 보낸 뒤, 사용자 본인의 "저장된 메시지"에 알림을 한 번 보낸다. 자기에게 보낸 메시지는 푸시 알림이 오지 않으므로 5초 뒤 예약 메시지(`schedule`)로 보내 리마인더 알림이 뜨게 한다. 형식:
+     ```
+     🚨 비상 알림 [낮음]            ❓ 확인이 필요해요
+     기철 · 16:44                   기철: "오빠 고향 어디야?"
+     "오빠 나 배아파."              기철 님 고향이 어디인지 알려 주세요.
+     (사유)
+     ```
+     비상이면 비상 알림만 보낸다. 알림에 답해 상대에게 전달하는 기능은 범위 밖이다.
 4. **페르소나**: 사용자 본인으로 답한다. 기본 지침(약속·송금·개인정보 결정 금지, 지어내지 말 것)과 채팅방 지침을 함께 넣는다.
 5. **끌 때**: `work_dir`(`backend/data/<user_id>/<chat_id>/`)를 지운다. 다시 켜면 다시 분석한다. 로그아웃하면 그 사용자의 폴더 전체를 지운다.
 

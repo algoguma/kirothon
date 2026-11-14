@@ -4,7 +4,7 @@ import asyncio
 import logging
 import shutil
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -16,6 +16,7 @@ from telethon.tl.custom import Message as TgMessage
 from app.ai import (
     ChatMessage,
     LLMError,
+    PersonaReply,
     analyze_chat,
     generate_persona_reply,
     generate_reply,
@@ -25,7 +26,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.models import ChatSettings, Message, utc_now
 from app.telegram.entities import display_name, is_private_user, message_text
-from app.timeutil import as_utc
+from app.timeutil import KST, as_utc
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ REPLY_HISTORY_LIMIT = 160  # persona prompt uses the last 150 + the new messages
 ANALYSIS_HISTORY_LIMIT = 1000  # style/memory analysis input on ON
 MAX_BUBBLES = 5  # a reply line becomes one Telegram message; cap to avoid spam
 BUBBLE_GAP_SEC = 1.2  # pause between bubbles so it reads like typing
+ALERT_DELAY_SEC = 5  # owner alert is scheduled this far ahead so it notifies as a reminder
 
 Key = tuple[int, int]  # (user_id, chat_id)
 AnalysisStatus = Literal["running", "ready", "failed"]
@@ -234,6 +236,8 @@ class AutoReplier:
                 await asyncio.shield(analysis)
 
             error: str | None = None
+            result: PersonaReply | None = None
+            partner = ""
             try:
                 history, me, partner = await self._history(
                     user_id, client, chat_id, REPLY_HISTORY_LIMIT
@@ -243,7 +247,8 @@ class AutoReplier:
                     result = await generate_persona_reply(
                         path, history, me, partner, row.ai_instructions
                     )
-                    # Emergency / "owner must answer" notices show up in the chat list.
+                    # Emergency / "owner must answer" notices show up in the chat list and
+                    # are sent to the owner's Saved Messages after the reply.
                     text, error = result.text, result.note
                 else:
                     # Analysis failed (spec 6.2): basic reply on the recent messages.
@@ -260,11 +265,40 @@ class AutoReplier:
                 del self._pending[key]
             await self._send_bubbles(key, client, session_id, text)
             await self._set_last_error(key, error)
+            if result is not None:
+                await self._alert_owner(client, partner, result)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             logger.warning("Auto reply failed for user %s: %s", user_id, type(exc).__name__)
             await self._set_last_error(key, "자동 답장을 보내지 못했습니다.")
+
+    @staticmethod
+    async def _alert_owner(client: TelegramClient, partner: str, result: PersonaReply) -> None:
+        """Emergency / needs-confirmation alert to the owner's Saved Messages.
+
+        Scheduled a few seconds ahead: a message the account sends to itself does not notify,
+        but a scheduled message in Saved Messages arrives as a reminder notification.
+        """
+        now = datetime.now(UTC).astimezone(KST).strftime("%H:%M")
+        quoted = result.input.replace("\n", " / ")
+        if result.emergency:
+            text = (
+                f"🚨 비상 알림 [{result.emergency.severity or '?'}]\n"
+                f"{partner} · {now}\n"
+                f'"{quoted}"\n'
+                f"{result.emergency.reason}"
+            )
+        elif result.confirmation_question:
+            text = f'❓ 확인이 필요해요\n{partner}: "{quoted}"\n{result.confirmation_question}'
+        else:
+            return
+        try:
+            await client.send_message(
+                "me", text, schedule=datetime.now(UTC) + timedelta(seconds=ALERT_DELAY_SEC)
+            )
+        except Exception as exc:
+            logger.warning("Owner alert failed: %s", type(exc).__name__)
 
     async def _send_bubbles(
         self, key: Key, client: TelegramClient, session_id: int, text: str

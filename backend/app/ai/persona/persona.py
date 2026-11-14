@@ -65,9 +65,28 @@ HOLD_SYSTEM = """너는 "{me}"야. "{partner}"와 채팅 중인데, {partner}가
 
 
 @dataclass(frozen=True)
+class Emergency:
+    severity: str  # 낮음 / 중간 / 높음
+    reason: str
+
+
+@dataclass(frozen=True)
 class PersonaReply:
+    """Same information as prototype/run.py's JSON (reply, emergency, needs_confirmation)."""
+
     text: str
-    note: str | None  # emergency / owner-question notice for the owner, if any
+    input: str  # the partner's new message(s) this replies to
+    emergency: Emergency | None = None
+    confirmation_question: str | None = None  # set when the owner must answer
+
+    @property
+    def note(self) -> str | None:
+        """Short notice for the chat list (last_error)."""
+        if self.emergency:
+            return f"[비상 {self.emergency.severity}] {self.emergency.reason}".replace("  ", " ")
+        if self.confirmation_question:
+            return f"[확인 필요] {self.confirmation_question}"
+        return None
 
 
 def is_ready(work_dir: str) -> bool:
@@ -140,8 +159,8 @@ def reply(
             },
             {"role": "user", "content": new_text},
         ]
-        question = res.owner_question or f'{partner}: "{new_text}" — 어떻게 답할까요?'
-        return PersonaReply(_generate(messages, me), f"[확인 필요] {question}")
+        question = res.owner_question or f'"{new_text}"에 어떻게 답할까요?'
+        return PersonaReply(_generate(messages, me), new_text, confirmation_question=question)
 
     extra = (instructions or "").strip()
     system = SYSTEM_PROMPT.format(
@@ -154,10 +173,10 @@ def reply(
         recent=to_transcript(recent),
     )
     content = new_text
-    note = None
+    emergency = None
     if res.emergency:
         reason = res.emergency_reason or "몸/마음 상태가 안 좋음"
         content += "\n\n" + EMERGENCY_HINT.format(partner=partner, reason=reason)
-        note = f"[비상 {res.severity or ''}] {reason}".replace("  ", " ")
+        emergency = Emergency(res.severity, reason)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": content}]
-    return PersonaReply(_generate(messages, me), note)
+    return PersonaReply(_generate(messages, me), new_text, emergency=emergency)
