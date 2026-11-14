@@ -94,7 +94,7 @@ async def generate_persona_reply(work_dir: str, history: list[ChatMessage], me: 
 **말투·기억 분석 답장** (`prototype/`의 분석 로직을 `backend/app/ai/persona/`로 옮긴 것, AI 담당):
 
 1. **켤 때**: 백엔드가 텔레그램에서 그 채팅방의 최근 메시지 최대 1000개를 가져와 `analyze_chat`을 백그라운드로 호출한다. `history.json`은 텔레그램 내보내기 형식(`{"messages": [{"type", "date", "from", "text"}]}`, 시각은 KST)이다. 분석은 최근 500개로 말투를, 1000개 전체로 약속·사건·상대 정보를 뽑으며 30초~2분 걸린다.
-2. **답장할 때**: 분석이 끝난 채팅방은 `generate_persona_reply`로, 아니면 `generate_reply`로 답한다. 백엔드는 최근 메시지 160개를 넘기고, 상대가 마지막으로 보낸 메시지들을 새 메시지로, 그 앞의 최근 150개를 원문으로 프롬프트에 넣는다.
+2. **답장할 때**: 분석이 끝난 채팅방은 `generate_persona_reply`로, 분석이 실패한 채팅방은 `generate_reply`로 답한다. 분석 중이면 답장을 미뤘다가 분석이 끝난 뒤 답한다(6.2). 백엔드는 최근 메시지 160개를 넘기고, 상대가 마지막으로 보낸 메시지들을 새 메시지로, 그 앞의 최근 150개를 원문으로 프롬프트에 넣는다.
 3. **판단**: 답장 전에 한 번 더 호출해 비상상황과 "주인 확인 필요"를 판단한다.
    - 주인 확인 필요(기억에 없는 약속·결정)면 "확인해보고 알려줄게" 같은 보류 답장만 보내고, 주인에게 물을 질문을 `note`로 돌려준다.
    - 비상상황이면 진지한 톤으로 답하고 사유를 `note`로 돌려준다.
@@ -234,11 +234,13 @@ kirothon/
 1. `auto_reply_sessions`에 `started_at = now()`로 새 행 생성
 2. `chat_settings.enabled = true`, `current_session_id` 설정
 3. 메모리 캐시에 `chat_id` 추가
-4. 말투·기억 분석을 백그라운드로 시작(3.4). 분석이 끝나기 전에는 기본 답장으로 동작한다. 백엔드를 다시 시작했을 때 분석이 없으면 다시 분석한다.
+4. 말투·기억 분석을 백그라운드로 시작(3.4). 분석 상태는 `analysis_status`(`running` → `ready` 또는 `failed`)로 채팅방 목록에 내려 준다. 백엔드를 다시 시작했을 때 분석이 없으면 다시 분석한다.
 
 ### 6.2 자동 답장 처리 (5~120초 지연)
 
 상대의 **마지막 메시지 뒤로 대기 시간 동안 새 메시지가 없으면** 답장한다(디바운스). 상대가 짧은 메시지를 연달아 보내도 답장은 한 번만 나가고, AI는 연달아 온 메시지를 모두 보고 답한다.
+
+**분석 중에는 기다린다**: 대기 시간이 지났는데 말투·기억 분석(6.1의 4)이 아직 끝나지 않았으면, 분석이 끝날 때까지 기다린 뒤 분석 결과로 답한다. 분석 없이 엉뚱한 답장이 나가지 않게 하기 위해서다. 기다리는 동안에도 사용자가 직접 답하거나 상대가 새 메시지를 보내면 지금처럼 취소되거나 다시 시작한다. 분석이 실패하면 기본 답장(`generate_reply`)으로 답한다.
 
 ```python
 pending: dict[tuple[int, int], asyncio.Task] = {}   # (user_id, chat_id) → 대기 중인 답장
@@ -376,9 +378,16 @@ async def reply_after_delay(user_id, chat_id):
 [
   { "chat_id": 123456789, "name": "김철수", "last_message_at": "2026-11-14T01:20:00Z",
     "enabled": true, "reply_delay_sec": 30, "ai_instructions": "회의 중이라고 안내",
-    "fallback_text": "나중에 연락드릴게요.", "current_session_id": 7, "last_error": null }
+    "fallback_text": "나중에 연락드릴게요.", "current_session_id": 7, "last_error": null,
+    "analysis_status": "running", "analysis_started_at": "2026-11-14T01:00:00Z" }
 ]
 ```
+
+- `analysis_status`: 말투·기억 분석 상태. 켜져 있을 때만 값이 있고 꺼져 있으면 `null`.
+  - `running`: 분석 중. 이 동안 들어온 메시지의 답장은 분석이 끝날 때까지 미룬다(6.2)
+  - `ready`: 분석 완료. 분석 결과로 답한다
+  - `failed`: 분석 실패. 기본 답장으로 답하고, 사유는 `last_error`에 남는다
+- `analysis_started_at`: 분석을 시작한 시각(UTC). `running`일 때만 값이 있고 나머지는 `null`. 화면에서 경과 시간을 보여 줄 때 쓴다.
 
 **`PUT /api/chats/{chat_id}/auto-reply`**
 ```json
@@ -386,7 +395,7 @@ async def reply_after_delay(user_id, chat_id):
 { "enabled": true, "reply_delay_sec": 60, "ai_instructions": "...", "fallback_text": "..." }
 // 응답 200: 위 목록의 항목 하나와 같은 형식
 ```
-`reply_delay_sec`이 5~120 밖이면 422.
+`reply_delay_sec`이 5~120 밖이면 422. 켜면 응답의 `analysis_status`는 `running`이다.
 
 ### 7.4 자동 답장 세션과 기록
 
@@ -415,14 +424,14 @@ async def reply_after_delay(user_id, chat_id):
 |---|---|---|
 | `/` | 메인(소개) 페이지: 캐릭터, 서비스 소개, "로그인" 버튼(`/login`으로 이동). 로그인 상태면 `/chats`로 이동 | `/me` |
 | `/login` | `api_id`·`api_hash`·전화번호 → 인증 코드 → (필요 시) 2FA 비밀번호, 한 페이지에서 단계 전환. 첫 단계에 my.telegram.org 발급 안내 링크 | `/auth/*` |
-| `/chats` | 1:1 채팅방 목록: 이름, 마지막 대화 시각, on/off 토글, 설정 버튼(대기 시간 슬라이더 5~120초, AI 지침, 대체 문구), 오류 표시(`last_error`), 검색창 | `/chats` |
+| `/chats` | 1:1 채팅방 목록: 이름, 마지막 대화 시각, on/off 토글, 설정 버튼(대기 시간 슬라이더 5~120초, AI 지침, 대체 문구), 오류 표시(`last_error`), 분석 중 진행 표시(`analysis_status`, 경과 시간), 검색창 | `/chats` |
 | `/chats/:chatId/sessions` | 세션 목록(시작·종료 시각, 메시지 수, AI 답장 수), 대화 미리 보기, 형식별 다운로드 버튼 | `/chats/{id}/sessions`, `/sessions/*` |
 | `/settings` | 로그아웃 | `/auth/logout` |
 
 - 로그인에 성공하면 바로 `/chats`로 이동한다.
 - 앱 시작 시 `GET /api/me`로 로그인 상태를 확인한다. 로그인이 필요한 화면에서 401이면 `/login`으로 보낸다.
 - 모든 화면 위에 로고와 서비스명("분신으로 자동답장")이 있는 고정 상단 바를 둔다.
-- 켜져 있는 채팅방의 답장 상태는 `/chats`를 10초마다 다시 불러와 갱신한다. 실시간 알림(WebSocket)은 해커톤 범위에서 제외한다.
+- 켜져 있는 채팅방의 답장 상태는 `/chats`를 10초마다 다시 불러와 갱신한다. 분석 중(`running`)인 채팅방이 있으면 3초마다 불러온다. 실시간 알림(WebSocket)은 해커톤 범위에서 제외한다.
 
 ## 9. 보안과 운영 주의사항
 
