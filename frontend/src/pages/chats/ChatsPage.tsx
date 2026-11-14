@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { api, type Chat } from '../../api'
 import { errorMessage } from '../../api/errors'
 import { MockTag } from '../../components/MockTag'
 import { formatKst } from '../../format'
 import { AnalysisProgress } from './AnalysisProgress'
 import { ChatSettingsModal } from './ChatSettingsModal'
+import { HistoryPanel } from './HistoryPanel'
 
 const POLL_MS = 10_000 // spec 8: refresh every 10 seconds
 const ANALYSIS_POLL_MS = 3_000 // spec 8: faster while an analysis is running
 const SEARCH_DEBOUNCE_MS = 300
 
-// Spec 8 /chats: 1:1 chat list with auto-reply toggle and settings.
+// Spec 8 /chats and /chats/:chatId: chat list on the left, the selected chat's history on the right.
 export default function ChatsPage() {
+  const param = useParams().chatId
+  const selectedChatId = param !== undefined && /^-?\d+$/.test(param) ? Number(param) : null
   const [chats, setChats] = useState<Chat[] | null>(null)
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -94,8 +97,11 @@ export default function ChatsPage() {
 
   const enabledCount = chats?.filter((c) => c.enabled).length ?? 0
 
+  const selectedName = chats?.find((c) => c.chat_id === selectedChatId)?.name ?? null
+
   return (
-    <main>
+    <main className={selectedChatId === null ? 'chats-split' : 'chats-split has-selection'}>
+      <div className="chats-pane">
       <div className="page-head">
         <h1>
           채팅방 <MockTag group="chats" />
@@ -129,8 +135,17 @@ export default function ChatsPage() {
 
       <ul className="chat-list">
         {chats?.map((chat) => (
-          <li key={chat.chat_id} className={chat.enabled ? 'chat-row on' : 'chat-row'}>
-            <div className="chat-main">
+          <li
+            key={chat.chat_id}
+            className={['chat-row', chat.enabled && 'on', chat.chat_id === selectedChatId && 'selected']
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <Link
+              to={`/chats/${chat.chat_id}`}
+              className="chat-main"
+              aria-current={chat.chat_id === selectedChatId ? 'page' : undefined}
+            >
               <div className="chat-name">{chat.name}</div>
               <div className="muted chat-meta">
                 마지막 대화 {formatKst(chat.last_message_at)}
@@ -143,11 +158,8 @@ export default function ChatsPage() {
               )}
               {/* last_error holds AI failures and AI notes (emergency, "ask the owner"), spec 3.4. */}
               {chat.last_error && <div className="chat-error">⚠ 알림: {chat.last_error}</div>}
-            </div>
+            </Link>
             <div className="chat-actions">
-              <Link to={`/chats/${chat.chat_id}/sessions`} className="button secondary small">
-                기록
-              </Link>
               <button type="button" className="secondary small" onClick={() => setEditing(chat)}>
                 설정
               </button>
@@ -166,6 +178,15 @@ export default function ChatsPage() {
           </li>
         ))}
       </ul>
+      </div>
+
+      <div className="history-pane">
+        {selectedChatId === null ? (
+          <p className="muted history-empty">왼쪽에서 채팅방을 고르면 자동 답장 기록이 여기에 보입니다.</p>
+        ) : (
+          <HistoryPanel key={selectedChatId} chatId={selectedChatId} chatName={selectedName} />
+        )}
+      </div>
 
       {editing && (
         <ChatSettingsModal
