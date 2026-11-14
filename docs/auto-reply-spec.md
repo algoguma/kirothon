@@ -79,12 +79,30 @@ ssh -N -L 8000:localhost:8000 <user>@<GPU 서버>
 
 ```python
 async def generate_reply(history: list[ChatMessage], instructions: str) -> str
-    # 실패·시간 초과 시 LLMError를 던진다. 대체 문구 처리는 백엔드가 한다.
+    # 기본 답장. 분석이 없거나 실패한 채팅방에서 쓴다. 실패·시간 초과 시 LLMError.
+async def analyze_chat(work_dir: str, history: list[ChatMessage], me: str, partner: str) -> None
+    # history를 work_dir/history.json으로 저장하고 말투(style.md)·기억(memory.md)을 뽑는다. 실패 시 LLMError.
+def persona_ready(work_dir: str) -> bool
+    # style.md와 memory.md가 모두 있으면 True.
+async def generate_persona_reply(work_dir: str, history: list[ChatMessage], me: str, partner: str,
+                                 instructions: str) -> PersonaReply
+    # 분석 결과로 답장. PersonaReply(text, note). note는 비상상황·주인 확인 안내(없으면 None). 실패 시 LLMError.
 ```
 
 `ChatMessage`는 `sender_name`, `text`, `date`, `is_outgoing`을 가진 dataclass다.
 
-**답장 생성 규칙** (`generate_reply` 내부, AI 담당):
+**말투·기억 분석 답장** (`prototype/`의 분석 로직을 `backend/app/ai/persona/`로 옮긴 것, AI 담당):
+
+1. **켤 때**: 백엔드가 텔레그램에서 그 채팅방의 최근 메시지 최대 1000개를 가져와 `analyze_chat`을 백그라운드로 호출한다. `history.json`은 텔레그램 내보내기 형식(`{"messages": [{"type", "date", "from", "text"}]}`, 시각은 KST)이다. 분석은 최근 500개로 말투를, 1000개 전체로 약속·사건·상대 정보를 뽑으며 30초~2분 걸린다.
+2. **답장할 때**: 분석이 끝난 채팅방은 `generate_persona_reply`로, 아니면 `generate_reply`로 답한다. 백엔드는 최근 메시지 160개를 넘기고, 상대가 마지막으로 보낸 메시지들을 새 메시지로, 그 앞의 최근 150개를 원문으로 프롬프트에 넣는다.
+3. **판단**: 답장 전에 한 번 더 호출해 비상상황과 "주인 확인 필요"를 판단한다.
+   - 주인 확인 필요(기억에 없는 약속·결정)면 "확인해보고 알려줄게" 같은 보류 답장만 보내고, 주인에게 물을 질문을 `note`로 돌려준다.
+   - 비상상황이면 진지한 톤으로 답하고 사유를 `note`로 돌려준다.
+   - 백엔드는 `note`를 `last_error`에 기록해 채팅방 목록에 보여 준다.
+4. **페르소나**: 사용자 본인으로 답한다. 기본 지침(약속·송금·개인정보 결정 금지, 지어내지 말 것)과 채팅방 지침을 함께 넣는다.
+5. **끌 때**: `work_dir`(`backend/data/<user_id>/<chat_id>/`)를 지운다. 다시 켜면 다시 분석한다. 로그아웃하면 그 사용자의 폴더 전체를 지운다.
+
+**기본 답장 규칙** (`generate_reply` 내부, AI 담당):
 
 - **시스템 지침**: 기본 지침 + 사용자가 채팅방별로 적은 지침(예: "나는 지금 회의 중이라고 정중하게 안내해 줘")
   - 기본 지침: 사용자 본인처럼 자연스럽게 한국어로 짧게 답할 것, 약속·송금·개인정보 제공 같은 결정은 하지 말 것, 모르는 내용은 지어내지 말 것
@@ -216,6 +234,7 @@ kirothon/
 1. `auto_reply_sessions`에 `started_at = now()`로 새 행 생성
 2. `chat_settings.enabled = true`, `current_session_id` 설정
 3. 메모리 캐시에 `chat_id` 추가
+4. 말투·기억 분석을 백그라운드로 시작(3.4). 분석이 끝나기 전에는 기본 답장으로 동작한다. 백엔드를 다시 시작했을 때 분석이 없으면 다시 분석한다.
 
 ### 6.2 자동 답장 처리 (5~120초 지연)
 
@@ -269,7 +288,7 @@ async def reply_after_delay(user_id, chat_id):
 
 ### 6.3 끄기 (off)
 
-1. 메모리 캐시에서 `chat_id` 제거, 대기 중인 답장 취소
+1. 메모리 캐시에서 `chat_id` 제거, 대기 중인 답장과 분석 취소, 분석 폴더(`history.json`, `style.md`, `memory.md`) 삭제
 2. 진행 중인 세션의 `ended_at = now()` 기록
 3. `chat_settings.enabled = false`, `current_session_id = NULL`
 
@@ -409,6 +428,7 @@ async def reply_after_delay(user_id, chat_id):
 - **Telethon 세션은 계정 전체 권한과 같다.** 유출되면 누구나 그 계정으로 메시지를 읽고 보낼 수 있다. 세션과 텔레그램 `api_hash`는 Fernet으로 암호화해 저장하고, 암호화 키(`ENCRYPTION_KEY`)는 `.env`에 DB와 분리해 둔다. `.gitignore`에는 이미 `.env`, `*.session`, `*.db`가 들어 있다.
 - **로컬에서만 연다.** 백엔드는 `127.0.0.1:8080`에만 바인딩한다(`uvicorn --host 127.0.0.1 --port 8080`). 같은 네트워크의 다른 기기에서 접속해야 하면 그때 HTTPS를 적용한다.
 - **GPU 서버 연결**: vLLM은 GPU 서버의 `127.0.0.1`에만 열고, 백엔드 PC에서 SSH 터널로만 접속한다(3.4). 요청과 대화 내용은 SSH로 암호화되어 인터넷을 지나간다. vLLM에 `--api-key`가 없어서 `--host 0.0.0.0`으로 외부에 열면 주소를 아는 누구나 GPU를 쓸 수 있다. 반드시 `127.0.0.1`로 띄운다. SSH 비밀번호는 저장소, `.env`, 로그에 남기지 않는다.
+- **대화 원문 파일**: 자동 답장이 켜져 있는 동안 `backend/data/<user_id>/<chat_id>/`에 대화 원문(최대 1000개)과 분석 결과가 평문 파일로 남는다. `.gitignore`로 커밋에서 빠지고, 끄거나 로그아웃하면 지운다. 이 파일들을 공유하지 않는다.
 - **사용자 간 데이터 분리**: 모든 조회에 `user_id` 조건을 건다. 남의 ID로 요청하면 404가 나오는지 확인한다.
 - **AI 답장의 위험**: AI가 사용자 대신 약속을 하거나 사실과 다른 말을 할 수 있다. 3.4의 기본 지침으로 줄이고, 기록에 AI 답장을 구분해 표시한다.
 - **로그인 시도 제한**: 같은 전화번호로 인증 코드를 짧은 간격으로 반복 요청하면 텔레그램이 계정을 일시 제한한다. 백엔드에서 1분에 1회로 막는다.

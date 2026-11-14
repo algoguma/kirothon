@@ -67,7 +67,7 @@ async def password(body: PasswordRequest, response: Response, db: DbSession) -> 
 
 @router.post("/logout", status_code=204)
 async def logout(user: CurrentUser, db: DbSession, response: Response) -> None:
-    await client_manager.remove_user(user.id)
+    await client_manager.remove_user(user.id, drop_data=True)
     # Auto reply cannot run without a session, so close any open auto-reply sessions.
     now = utc_now()
     await db.execute(

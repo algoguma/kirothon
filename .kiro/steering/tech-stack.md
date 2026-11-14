@@ -19,7 +19,7 @@ backend/
     main.py          # FastAPI 앱, lifespan에서 ClientManager 시작
     api/             # auth, me, chats, sessions 라우터        (Backend)
     telegram/        # ClientManager, 이벤트 핸들러, 디바운스  (Backend)
-    ai/              # generate_reply, 프롬프트                 (AI)
+    ai/              # generate_reply, 말투·기억 분석(persona/)  (AI)
     models.py, db.py, crypto.py                               (Backend)
   requirements.txt
   .env.example

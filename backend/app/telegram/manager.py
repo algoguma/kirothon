@@ -70,9 +70,12 @@ class ClientManager:
         self._auto.attach(user_id, client, display_name(me))
         self._clients[user_id] = client
         logger.info("Telegram client connected for user %s", user_id)
+        for chat_id in self._enabled.get(user_id, {}):
+            self._auto.ensure_analysis(user_id, chat_id, client)
 
-    async def remove_user(self, user_id: int) -> None:
-        self._auto.cancel_user(user_id)
+    async def remove_user(self, user_id: int, drop_data: bool = False) -> None:
+        """drop_data=True on logout: also delete the user's chat history and analysis."""
+        self._auto.cancel_user(user_id, drop_data)
         self._enabled.pop(user_id, None)
         client = self._clients.pop(user_id, None)
         if client is not None:
@@ -94,6 +97,13 @@ class ClientManager:
     def disable(self, user_id: int, chat_id: int) -> None:
         self._enabled.get(user_id, {}).pop(chat_id, None)
         self._auto.cancel(user_id, chat_id)
+        self._auto.drop_analysis(user_id, chat_id)  # chat history is kept only while on
+
+    def start_analysis(self, user_id: int, chat_id: int) -> None:
+        """Turned on: export recent chat and extract style/memory in the background."""
+        client = self.find(user_id)
+        if client is not None:
+            self._auto.start_analysis(user_id, chat_id, client)
 
     def session_for(self, user_id: int, chat_id: int) -> int | None:
         return self._enabled.get(user_id, {}).get(chat_id)

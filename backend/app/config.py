@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     llm_use_stub: bool = True
 
     database_url: str = "sqlite+aiosqlite:///./kirothon.db"
+    # Per-chat chat history and style/memory analysis while auto reply is on (git-ignored).
+    data_dir: str = "./data"
 
     @field_validator("llm_base_url")
     @classmethod
