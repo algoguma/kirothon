@@ -16,7 +16,7 @@ from openai import (
 )
 
 from app.ai.persona import persona
-from app.ai.persona.persona import PersonaReply
+from app.ai.persona.persona import Emergency, PersonaReply
 from app.config import get_settings
 from app.timeutil import KST
 
@@ -166,7 +166,7 @@ async def generate_persona_reply(
 ) -> PersonaReply:
     """Reply in the owner's style using the analysis in work_dir. Raises LLMError on failure."""
     if get_settings().llm_use_stub:
-        return PersonaReply("[stub] 지금은 답장이 어려워요. 나중에 연락드릴게요.", None)
+        return PersonaReply("[stub] 지금은 답장이 어려워요. 나중에 연락드릴게요.", "")
     # The partner's trailing messages (after my last one) are the new message to answer.
     split = len(history)
     while split > 0 and not history[split - 1].is_outgoing:
@@ -189,6 +189,7 @@ async def generate_persona_reply(
 __all__ = [
     "ChatMessage",
     "LLMError",
+    "Emergency",
     "PersonaReply",
     "analyze_chat",
     "generate_persona_reply",
