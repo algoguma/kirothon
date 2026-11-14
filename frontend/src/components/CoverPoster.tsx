@@ -3,10 +3,10 @@ import { CoverGhost } from './CoverGhost'
 // Webtoon-cover style title art, an homage to "분신으로 자동사냥". Drawn with SVG/CSS only.
 export function CoverPoster() {
   return (
-    <figure className="poster" aria-label="분신으로 자동답장">
+    <figure className="poster" role="img" aria-label="분신으로 자동답장">
       <CoverGhost className="poster-ghost" />
 
-      <div className="poster-title">
+      <div className="poster-title" aria-hidden="true">
         <svg className="bolt bolt-left" viewBox="0 0 60 40" aria-hidden="true">
           <path d="M58 6L30 14L38 20L4 34L26 18L18 14Z" />
         </svg>
