@@ -1,4 +1,4 @@
-import { request } from './http'
+import { download, request } from './http'
 import type {
   AutoReplySession,
   AutoReplyUpdate,
@@ -28,8 +28,8 @@ export const realApi = {
   sessions: (chatId: number) => request<AutoReplySession[]>('GET', `/chats/${chatId}/sessions`),
   sessionMessages: (sessionId: number) =>
     request<SessionMessage[]>('GET', `/sessions/${sessionId}/messages`),
-  exportUrl: (sessionId: number, format: ExportFormat) =>
-    `/api/sessions/${sessionId}/export?format=${format}`,
+  exportSession: (sessionId: number, format: ExportFormat) =>
+    download(`/sessions/${sessionId}/export?format=${format}`, `session-${sessionId}.${format}`),
 }
 
 export type Api = typeof realApi
