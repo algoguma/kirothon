@@ -440,9 +440,17 @@ input:focus {
 /* ---- Chats ---- */
 .page-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 12px;
+}
+.page-head h1 {
+  white-space: nowrap;
+}
+.page-head > .muted {
+  font-size: 14px;
+  white-space: nowrap;
 }
 .search {
   width: 100%;
@@ -634,6 +642,29 @@ button.small {
 }
 .switch input:disabled + .slider {
   opacity: 0.6;
+}
+/* Turned on but analysis not done yet (spec 7.3 analysis_status "running"). */
+.switch.pending .slider {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.switch.pending .slider::before {
+  transform: translateX(10px);
+  background: var(--accent);
+  animation: switch-pulse 1.2s ease-in-out infinite;
+}
+@keyframes switch-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.chat-row.analyzing {
+  border-left-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch.pending .slider::before {
+    animation: none;
+  }
 }
 
 /* Modal */
