@@ -1,7 +1,6 @@
 import { Link, Navigate } from 'react-router'
 import { useAuth } from '../auth/context'
-import { SERVICE_NAME } from '../brand'
-import { Ghost } from '../components/Ghost'
+import { CoverPoster } from '../components/CoverPoster'
 
 const FEATURES = [
   { title: '채팅방별로 켜고 끄기', body: '자동 답장을 원하는 1:1 채팅방만 골라서 켭니다.' },
@@ -17,11 +16,19 @@ export default function LandingPage() {
 
   return (
     <main className="landing">
-      <section className="hero">
-        <Ghost size={180} animated />
-        <div className="hero-text">
-          <h1>{SERVICE_NAME}</h1>
-          <p className="hero-sub">바쁠 땐 분신이 텔레그램 답장을 대신해 드려요.</p>
+      <section className="hero-cover">
+        <CoverPoster />
+        <div className="hero-copy">
+          <p className="hero-kicker">바쁜 당신 대신, 분신이 답장합니다</p>
+          <h1>
+            텔레그램 답장은
+            <br />
+            <span className="hero-accent">분신</span>에게 맡기세요
+          </h1>
+          <p className="hero-sub">
+            자동 답장을 켠 채팅방에 메시지가 오면, 잠시 기다렸다가 AI 분신이 내 말투로 답합니다.
+            내가 직접 답하면 분신은 조용히 물러납니다.
+          </p>
           <Link to="/login" className="button large">
             텔레그램으로 로그인
           </Link>
