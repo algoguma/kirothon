@@ -203,17 +203,10 @@ input:focus {
 
 /* ---- Landing: webtoon cover ---- */
 .hero-cover {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 500px) 1fr;
+  gap: 40px;
   align-items: center;
-  gap: 28px;
-  text-align: center;
-}
-.hero-cover .poster {
-  width: min(100%, 560px);
-}
-.hero-copy {
-  max-width: 640px;
 }
 .hero-kicker {
   margin: 0 0 8px;
@@ -362,7 +355,13 @@ input:focus {
 }
 @media (max-width: 760px) {
   .hero-cover {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
     gap: 20px;
+  }
+  .poster {
+    width: min(100%, 420px);
   }
   .hero-copy h1 {
     font-size: 32px;
