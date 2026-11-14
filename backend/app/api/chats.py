@@ -12,6 +12,7 @@ from telethon.tl.types import User as TgUser
 from app.api.deps import CurrentUser, DbSession
 from app.errors import ApiError
 from app.models import AutoReplySession, ChatSettings, utc_now
+from app.telegram.auto_reply import AnalysisStatus
 from app.telegram.entities import display_name, is_private_user
 from app.telegram.manager import client_manager
 from app.timeutil import iso_utc
@@ -31,6 +32,8 @@ class ChatOut(BaseModel):
     fallback_text: str | None
     current_session_id: int | None
     last_error: str | None
+    analysis_status: AnalysisStatus | None
+    analysis_started_at: str | None
 
 
 class AutoReplyUpdate(BaseModel):
@@ -41,8 +44,9 @@ class AutoReplyUpdate(BaseModel):
 
 
 def _chat_out(
-    chat_id: int, name: str, last_at: datetime | None, row: ChatSettings | None
+    user_id: int, chat_id: int, name: str, last_at: datetime | None, row: ChatSettings | None
 ) -> ChatOut:
+    status, started_at = client_manager.analysis_status(user_id, chat_id)
     return ChatOut(
         chat_id=chat_id,
         name=name,
@@ -53,6 +57,8 @@ def _chat_out(
         fallback_text=row.fallback_text if row else None,
         current_session_id=row.current_session_id if row else None,
         last_error=row.last_error if row else None,
+        analysis_status=status,
+        analysis_started_at=iso_utc(started_at),
     )
 
 
@@ -75,7 +81,7 @@ async def list_chats(user: CurrentUser, db: DbSession, q: str | None = None) -> 
             row.chat_name = name
         if needle and needle not in name.lower():
             continue
-        result.append(_chat_out(dialog.id, name, dialog.date, row))
+        result.append(_chat_out(user.id, dialog.id, name, dialog.date, row))
     await db.commit()
     return result
 
@@ -148,4 +154,4 @@ async def update_auto_reply(
         client_manager.disable(user.id, chat_id)
 
     last = await client.get_messages(entity, limit=1)
-    return _chat_out(chat_id, row.chat_name, last[0].date if last else None, row)
+    return _chat_out(user.id, chat_id, row.chat_name, last[0].date if last else None, row)

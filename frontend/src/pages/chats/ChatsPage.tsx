@@ -4,9 +4,11 @@ import { api, type Chat } from '../../api'
 import { errorMessage } from '../../api/errors'
 import { MockTag } from '../../components/MockTag'
 import { formatKst } from '../../format'
+import { AnalysisProgress } from './AnalysisProgress'
 import { ChatSettingsModal } from './ChatSettingsModal'
 
 const POLL_MS = 10_000 // spec 8: refresh every 10 seconds
+const ANALYSIS_POLL_MS = 3_000 // spec 8: faster while an analysis is running
 const SEARCH_DEBOUNCE_MS = 300
 
 // Spec 8 /chats: 1:1 chat list with auto-reply toggle and settings.
@@ -34,15 +36,17 @@ export default function ChatsPage() {
     }
   }, [])
 
-  // Reload on search change (debounced) and then every POLL_MS.
+  const analyzing = chats?.some((c) => c.analysis_status === 'running') ?? false
+
+  // Reload on search change (debounced) and then every POLL_MS (faster while analyzing).
   useEffect(() => {
     const first = setTimeout(() => load(query), SEARCH_DEBOUNCE_MS)
-    const timer = setInterval(() => load(query), POLL_MS)
+    const timer = setInterval(() => load(query), analyzing ? ANALYSIS_POLL_MS : POLL_MS)
     return () => {
       clearTimeout(first)
       clearInterval(timer)
     }
-  }, [query, load])
+  }, [query, load, analyzing])
 
   const replace = useCallback(
     (updated: Chat) =>
@@ -131,7 +135,12 @@ export default function ChatsPage() {
               <div className="muted chat-meta">
                 마지막 대화 {formatKst(chat.last_message_at)}
                 {chat.enabled && ` · ${chat.reply_delay_sec}초 뒤 답장`}
+                {chat.analysis_status === 'ready' && <span className="chip ready">분신 준비 완료</span>}
+                {chat.analysis_status === 'failed' && <span className="chip failed">기본 답장</span>}
               </div>
+              {chat.analysis_status === 'running' && (
+                <AnalysisProgress startedAt={chat.analysis_started_at} />
+              )}
               {/* last_error holds AI failures and AI notes (emergency, "ask the owner"), spec 3.4. */}
               {chat.last_error && <div className="chat-error">⚠ 알림: {chat.last_error}</div>}
             </div>
