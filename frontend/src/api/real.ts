@@ -6,12 +6,13 @@ import type {
   ExportFormat,
   LlmSettings,
   MeResponse,
+  SendCodeRequest,
   SendCodeResponse,
   SessionMessage,
 } from './types'
 
 export const realApi = {
-  sendCode: (phone: string) => request<SendCodeResponse>('POST', '/auth/send-code', { phone }),
+  sendCode: (body: SendCodeRequest) => request<SendCodeResponse>('POST', '/auth/send-code', body),
   signIn: (login_id: string, code: string) =>
     request<MeResponse>('POST', '/auth/sign-in', { login_id, code }),
   password: (login_id: string, password: string) =>
