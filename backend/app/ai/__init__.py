@@ -3,6 +3,7 @@
 Changing these signatures requires agreement between Backend and AI.
 """
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -14,7 +15,10 @@ from openai import (
     AsyncOpenAI,
 )
 
+from app.ai.persona import persona
+from app.ai.persona.persona import PersonaReply
 from app.config import get_settings
+from app.timeutil import KST
 
 
 @dataclass(frozen=True)
@@ -112,4 +116,82 @@ async def generate_reply(history: list[ChatMessage], instructions: str) -> str:
     return text
 
 
-__all__ = ["ChatMessage", "LLMError", "generate_reply"]
+# --- Persona (style + memory) reply, ported from prototype/ -------------------------------
+# The work directory belongs to one (user, chat); the backend creates it on ON and deletes it
+# on OFF. Everything inside runs the blocking prototype code in a worker thread.
+
+
+def _to_export(history: list[ChatMessage]) -> list[dict]:
+    return [
+        {
+            "type": "message",
+            "date": m.date.astimezone(KST).strftime("%Y-%m-%dT%H:%M:%S"),
+            "from": m.sender_name,
+            "text": m.text,
+        }
+        for m in history
+    ]
+
+
+def _to_messages(history: list[ChatMessage]) -> list[persona.Message]:
+    return [
+        persona.Message(m.date.astimezone(KST).strftime("%Y-%m-%d %H:%M"), m.sender_name, m.text)
+        for m in history
+        if m.text
+    ]
+
+
+def persona_ready(work_dir: str) -> bool:
+    return persona.is_ready(work_dir)
+
+
+async def analyze_chat(work_dir: str, history: list[ChatMessage], me: str, partner: str) -> None:
+    """Save `history` (oldest first) as JSON in work_dir and extract style.md / memory.md.
+
+    Takes a minute or two. Raises LLMError on failure.
+    """
+    if get_settings().llm_use_stub:
+        return
+    persona.write_history(work_dir, _to_export(history))
+    try:
+        await asyncio.to_thread(persona.analyze, work_dir, me, partner)
+    except ValueError as exc:
+        raise LLMError(str(exc)) from exc
+    except Exception as exc:
+        raise LLMError(f"대화 분석 실패: {exc.__class__.__name__}") from exc
+
+
+async def generate_persona_reply(
+    work_dir: str, history: list[ChatMessage], me: str, partner: str, instructions: str
+) -> PersonaReply:
+    """Reply in the owner's style using the analysis in work_dir. Raises LLMError on failure."""
+    if get_settings().llm_use_stub:
+        return PersonaReply("[stub] 지금은 답장이 어려워요. 나중에 연락드릴게요.", None)
+    # The partner's trailing messages (after my last one) are the new message to answer.
+    split = len(history)
+    while split > 0 and not history[split - 1].is_outgoing:
+        split -= 1
+    new = [m.text for m in history[split:] if m.text]
+    if not new:
+        raise LLMError("답장할 상대 메시지가 없습니다.")
+    before = _to_messages(history[:split])
+    try:
+        result = await asyncio.to_thread(
+            persona.reply, work_dir, me, partner, before, "\n".join(new), instructions
+        )
+    except Exception as exc:
+        raise LLMError(f"LLM 호출 실패: {exc.__class__.__name__}") from exc
+    if not result.text:
+        raise LLMError("LLM이 빈 응답을 반환했습니다.")
+    return result
+
+
+__all__ = [
+    "ChatMessage",
+    "LLMError",
+    "PersonaReply",
+    "analyze_chat",
+    "generate_persona_reply",
+    "generate_reply",
+    "persona_ready",
+]

@@ -8,6 +8,9 @@
 *.sqlite
 *.sqlite3
 
+# Chat history and analysis written while auto reply is on (backend/app/config.py data_dir)
+backend/data/
+
 # Python
 __pycache__/
 *.py[cod]

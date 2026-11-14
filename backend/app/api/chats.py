@@ -133,7 +133,8 @@ async def update_auto_reply(
         row.ai_instructions = body.ai_instructions
     if "fallback_text" in body.model_fields_set:
         row.fallback_text = (body.fallback_text or "").strip() or None
-    if body.enabled is True and not row.enabled:
+    turned_on = body.enabled is True and not row.enabled
+    if turned_on:
         await turn_on(db, user.id, row)
     elif body.enabled is False and row.enabled:
         await turn_off(db, row)
@@ -141,6 +142,8 @@ async def update_auto_reply(
     # Update the in-memory cache only after the DB change is committed.
     if row.enabled and row.current_session_id is not None:
         client_manager.enable(user.id, chat_id, row.current_session_id)
+        if turned_on:
+            client_manager.start_analysis(user.id, chat_id)
     else:
         client_manager.disable(user.id, chat_id)
 

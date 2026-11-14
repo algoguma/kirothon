@@ -20,7 +20,12 @@
   ```python
   async def generate_reply(history: list[ChatMessage], instructions: str) -> str
       # 실패·시간 초과 시 LLMError를 던진다. 대체 문구 처리는 백엔드가 한다.
+  async def analyze_chat(work_dir: str, history: list[ChatMessage], me: str, partner: str) -> None
+  def persona_ready(work_dir: str) -> bool
+  async def generate_persona_reply(work_dir: str, history: list[ChatMessage], me: str, partner: str,
+                                   instructions: str) -> PersonaReply  # (text, note)
   ```
+  말투·기억 분석 답장의 동작은 명세 3.4를 따른다. 구현은 `backend/app/ai/persona/`(`prototype/`에서 옮김).
   `ChatMessage`는 `sender_name`, `text`, `date`, `is_outgoing`을 가진 dataclass다. 시그니처를 바꾸려면 Backend와 AI가 함께 합의한다.
 
 ## 에이전트 작업 규칙
