@@ -14,7 +14,7 @@ const groupOf: Record<keyof Api, MockGroup> = {
   updateAutoReply: 'chats',
   sessions: 'sessions',
   sessionMessages: 'sessions',
-  exportUrl: 'sessions',
+  exportSession: 'sessions',
 }
 
 export const api = Object.fromEntries(
@@ -31,5 +31,5 @@ export const mockLabel =
   mockedGroups.size === MOCK_GROUPS.length ? 'MOCK' : `MOCK: ${[...mockedGroups].join(', ')}`
 
 export { isMocked } from './mockConfig'
-export { ApiError } from './http'
+export { ApiError, saveFile } from './http'
 export type * from './types'
