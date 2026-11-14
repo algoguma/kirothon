@@ -186,6 +186,7 @@ button:disabled {
   cursor: default;
 }
 .button.small {
+  margin-top: 0; /* .small is also a text utility with a top margin */
   padding: 6px 12px;
   font-size: 14px;
 }
@@ -512,6 +513,7 @@ button.secondary:hover:not(:disabled) {
   background: var(--border);
 }
 button.small {
+  margin-top: 0;
   padding: 6px 12px;
   font-size: 14px;
 }

@@ -132,7 +132,8 @@ export default function ChatsPage() {
                 마지막 대화 {formatKst(chat.last_message_at)}
                 {chat.enabled && ` · ${chat.reply_delay_sec}초 뒤 답장`}
               </div>
-              {chat.last_error && <div className="chat-error">⚠ 마지막 오류: {chat.last_error}</div>}
+              {/* last_error holds AI failures and AI notes (emergency, "ask the owner"), spec 3.4. */}
+              {chat.last_error && <div className="chat-error">⚠ 알림: {chat.last_error}</div>}
             </div>
             <div className="chat-actions">
               <Link to={`/chats/${chat.chat_id}/sessions`} className="button secondary small">

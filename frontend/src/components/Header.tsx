@@ -4,6 +4,23 @@ import { useAuth } from '../auth/context'
 import { SERVICE_NAME } from '../brand'
 import { ThemeToggle } from './ThemeToggle'
 
+const ChatIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width={20}
+    height={20}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M4 5h16v11H9l-5 4z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </svg>
+)
+
 const GearIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -36,7 +53,11 @@ export function Header() {
         </Link>
         {useMock && <span className="mock-badge">{mockLabel}</span>}
         <nav className="topbar-nav">
-          {loggedIn && <NavLink to="/chats">채팅방</NavLink>}
+          {loggedIn && (
+            <NavLink to="/chats" className="icon-button" aria-label="채팅방" title="채팅방">
+              <ChatIcon />
+            </NavLink>
+          )}
           <ThemeToggle />
           {loggedIn && (
             <NavLink to="/settings" className="icon-button" aria-label="설정" title="설정">
