@@ -6,12 +6,12 @@ inclusion: always
 
 | 영역 | 선택 |
 |---|---|
-| Frontend | React + Vite + TypeScript, `localhost:5173`, `/api`는 Vite proxy로 `127.0.0.1:8000`에 전달 |
-| Backend | Python 3.11+, FastAPI, uvicorn (`--host 127.0.0.1`) |
+| Frontend | React + Vite + TypeScript, `localhost:5173`, `/api`는 Vite proxy로 `127.0.0.1:8080`에 전달 |
+| Backend | Python 3.11+, FastAPI, uvicorn (`--host 127.0.0.1 --port 8080`) |
 | Telegram | Telethon + `StringSession` (사용자 계정, Bot API 아님) |
-| AI | `openai` 패키지, `base_url = LLM_BASE_URL + "/v1"`, GPU 서버의 vLLM |
+| AI | `openai` 패키지, `base_url = LLM_BASE_URL + "/v1"`, GPU 서버의 vLLM. SSH 터널(`127.0.0.1:8000`)로 접속, API 키 없음 |
 | DB | SQLite (SQLAlchemy async 또는 aiosqlite) |
-| 암호화 | `cryptography` Fernet (Telethon 세션, LLM API 키) |
+| 암호화 | `cryptography` Fernet (Telethon 세션, 텔레그램 `api_hash`) |
 
 ```
 backend/
@@ -19,7 +19,7 @@ backend/
     main.py          # FastAPI 앱, lifespan에서 ClientManager 시작
     api/             # auth, me, chats, sessions 라우터        (Backend)
     telegram/        # ClientManager, 이벤트 핸들러, 디바운스  (Backend)
-    ai/              # generate_reply, verify_api_key, 프롬프트 (AI)
+    ai/              # generate_reply, 프롬프트                 (AI)
     models.py, db.py, crypto.py                               (Backend)
   requirements.txt
   .env.example

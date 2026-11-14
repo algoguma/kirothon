@@ -16,17 +16,15 @@
 ## 역할 간 계약
 
 - **Frontend ↔ Backend**: `docs/auto-reply-spec.md` 7장(API 명세). 바꿀 때는 명세 PR을 먼저 머지한다.
-- **Backend ↔ AI**: `backend/app/ai/__init__.py`에서 아래 두 함수만 노출한다. 백엔드는 이 함수만 호출하고 내부 구현에 의존하지 않는다.
+- **Backend ↔ AI**: `backend/app/ai/__init__.py`에서 아래 함수만 노출한다. 백엔드는 이 함수만 호출하고 내부 구현에 의존하지 않는다.
   ```python
-  async def generate_reply(api_key: str, history: list[ChatMessage], instructions: str) -> str
+  async def generate_reply(history: list[ChatMessage], instructions: str) -> str
       # 실패·시간 초과 시 LLMError를 던진다. 대체 문구 처리는 백엔드가 한다.
-  async def verify_api_key(api_key: str) -> None
-      # GET {LLM_BASE_URL}/v1/models. 실패 시 LLMError.
   ```
   `ChatMessage`는 `sender_name`, `text`, `date`, `is_outgoing`을 가진 dataclass다. 시그니처를 바꾸려면 Backend와 AI가 함께 합의한다.
 
 ## 에이전트 작업 규칙
 
 - 명세와 다르게 구현해야 하면 코드보다 명세 수정 제안을 먼저 한다.
-- `.env`, `*.session`, `*.db`, API 키, Telethon 세션 문자열은 읽어서 출력하거나 커밋하지 않는다.
+- `.env`, `*.session`, `*.db`, SSH 접속 정보, Telethon 세션 문자열은 읽어서 출력하거나 커밋하지 않는다.
 - 커밋, 브랜치, PR 규칙은 `.kiro/steering/git-workflow.md`를 따른다.
