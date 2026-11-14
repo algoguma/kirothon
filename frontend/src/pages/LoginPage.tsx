@@ -6,6 +6,17 @@ import { useAuth } from '../auth/context'
 
 type Step = 'phone' | 'code' | 'password'
 
+/** Browser validation message in Korean for a pattern mismatch. */
+function hint(message: string) {
+  return {
+    onInvalid: (e: FormEvent<HTMLInputElement>) => {
+      const el = e.currentTarget
+      if (el.validity.patternMismatch) el.setCustomValidity(message)
+    },
+    onInput: (e: FormEvent<HTMLInputElement>) => e.currentTarget.setCustomValidity(''),
+  }
+}
+
 /** "010-1234-5678" -> "+821012345678". Keeps numbers that already start with "+". */
 function normalizePhone(input: string): string {
   const trimmed = input.trim()
@@ -112,6 +123,7 @@ export default function LoginPage() {
               placeholder="1234567"
               value={apiId}
               onChange={(e) => setApiId(e.target.value)}
+              {...hint('api_id는 숫자만 입력합니다.')}
             />
           </label>
           <label>
@@ -121,10 +133,14 @@ export default function LoginPage() {
               autoComplete="off"
               required
               pattern="[0-9a-fA-F]{32}"
-              title="32자리 16진수"
+              aria-describedby="api-hash-hint"
               value={apiHash}
               onChange={(e) => setApiHash(e.target.value)}
+              {...hint('api_hash는 영문 a~f와 숫자로 된 32자리입니다.')}
             />
+            <span id="api-hash-hint" className="field-hint">
+              영문 a~f와 숫자 32자리 ({apiHash.trim().length}/32)
+            </span>
           </label>
           <label>
             전화번호

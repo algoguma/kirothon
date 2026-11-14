@@ -11,6 +11,8 @@ import { errorMessage } from '../../api/errors'
 import { MockTag } from '../../components/MockTag'
 import { formatKst, formatKstTime } from '../../format'
 
+const POLL_MS = 10_000 // same cadence as /chats
+
 const FORMATS: { format: ExportFormat; label: string }[] = [
   { format: 'json', label: 'JSON' },
   { format: 'csv', label: 'CSV' },
@@ -48,17 +50,41 @@ export default function SessionsPage() {
     )
   }, [chatId])
 
+  // Refresh the list every POLL_MS so counts, new sessions and session ends show up.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      api.sessions(chatId).then(
+        (list) => {
+          setSessions(list)
+          setError(null)
+          // A session appeared while nothing was selected (e.g. auto reply just turned on).
+          setSelectedId((id) => id ?? list[0]?.id ?? null)
+        },
+        () => {}, // keep showing the last good list; the next tick retries
+      )
+    }, POLL_MS)
+    return () => clearInterval(timer)
+  }, [chatId])
+
+  const selected = sessions?.find((s) => s.id === selectedId) ?? null
+  const selectedLive = selected !== null && selected.ended_at === null
+
   useEffect(() => {
     if (selectedId === null) return
     let cancelled = false
-    api.sessionMessages(selectedId).then(
-      (list) => !cancelled && setPreview({ id: selectedId, messages: list }),
-      (e: unknown) => !cancelled && setPreview({ id: selectedId, error: errorMessage(e) }),
-    )
+    const fetchMessages = () =>
+      api.sessionMessages(selectedId).then(
+        (list) => !cancelled && setPreview({ id: selectedId, messages: list }),
+        (e: unknown) => !cancelled && setPreview({ id: selectedId, error: errorMessage(e) }),
+      )
+    fetchMessages()
+    // A live session keeps receiving messages (auto replies included); refresh the preview.
+    const timer = selectedLive ? setInterval(fetchMessages, POLL_MS) : undefined
     return () => {
       cancelled = true
+      clearInterval(timer)
     }
-  }, [selectedId])
+  }, [selectedId, selectedLive])
 
   const current = preview?.id === selectedId ? preview : null
   const messages = current?.messages ?? null
@@ -81,8 +107,6 @@ export default function SessionsPage() {
       setDownloading(null)
     }
   }
-
-  const selected = sessions?.find((s) => s.id === selectedId) ?? null
 
   return (
     <main>
@@ -115,7 +139,7 @@ export default function SessionsPage() {
                   aria-pressed={s.id === selectedId}
                 >
                   <span className="session-range">
-                    {formatKst(s.started_at)} ~ {s.ended_at ? formatKst(s.ended_at) : ''}
+                    {formatKst(s.started_at)} ~ {s.ended_at ? formatKst(s.ended_at) : '지금'}
                     {!s.ended_at && <span className="live-badge">진행 중</span>}
                   </span>
                   <span className="session-counts">
