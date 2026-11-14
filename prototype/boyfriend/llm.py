@@ -5,7 +5,7 @@ from typing import Iterator
 
 from openai import OpenAI
 
-from . import config
+from . import config, tunnel
 
 _client = OpenAI(base_url=config.VLLM_BASE_URL, api_key=config.VLLM_API_KEY, timeout=600)
 
@@ -35,4 +35,6 @@ def stream(messages: list[dict], *, temperature=0.85, max_tokens=300) -> Iterato
 
 
 def health() -> str:
+    """vLLM 연결 확인 (필요하면 .env의 SSH_TUNNEL로 터널을 먼저 자동 연결)"""
+    tunnel.ensure()
     return ", ".join(m.id for m in _client.models.list().data)

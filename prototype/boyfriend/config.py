@@ -3,11 +3,16 @@ import os
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 프로젝트 폴더
+DEFAULT_ENV = os.path.join(ROOT, ".env")
+# 읽을 .env 경로: KIROTHON_ENV 환경변수(run.py --env가 설정) > 프로젝트 폴더의 .env
+ENV_FILE = os.path.abspath(os.path.expanduser(os.getenv("KIROTHON_ENV") or DEFAULT_ENV))
 
 
-def _load_dotenv(path: str = os.path.join(ROOT, ".env")) -> None:
+def _load_dotenv(path: str = ENV_FILE) -> None:
     """의존성 없이 .env 읽기 (이미 설정된 환경변수가 우선)"""
     if not os.path.exists(path):
+        if path != DEFAULT_ENV:  # 직접 지정한 파일이 없으면 오류 (기본 .env는 없어도 됨)
+            raise FileNotFoundError(f"env 파일이 없습니다: {path}")
         return
     for line in open(path, encoding="utf-8"):
         line = line.strip()
