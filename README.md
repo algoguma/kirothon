@@ -2,6 +2,10 @@
 
 <p align="center"><img src="docs/cover.png" alt="분신으로 자동답장" width="200"></p>
 
+## 🎬 시연 데모 영상
+
+[▶ 시연 데모 영상 보기 (Google Drive)](https://drive.google.com/drive/folders/1yrVlYxeC0Z5kaF5rC6n2qMtNP1pwF_hc?hl=ko)
+
 > **데이트 준비 중에 여자친구 연락을 놓쳐서 서운하게 한 적, 바쁜 날 친구 메시지에 하루 늦게 답한 적, 운전 중이라 답장을 못 해서 "왜 읽고 답이 없어?"라는 말을 들어 본 적 있으신가요?**
 >
 > 이제 나 대신 **내 말투로**, **우리가 나눈 대화를 기억하며** 답해 주는 분신을 켜 두세요.
