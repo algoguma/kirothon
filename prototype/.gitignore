@@ -1,0 +1,10 @@
+# 개인 대화 데이터 / 추출 결과는 업로드 금지
+*.txt
+!requirements.txt
+profile*.json
+.env
+.venv/
+__pycache__/
+*.pyc
+.gradio/
+output/
