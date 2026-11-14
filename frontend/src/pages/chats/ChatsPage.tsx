@@ -95,7 +95,10 @@ export default function ChatsPage() {
     [replace],
   )
 
-  const enabledCount = chats?.filter((c) => c.enabled).length ?? 0
+  // A chat counts as on only after its analysis is done; until then it is "analyzing".
+  const isAnalyzing = (c: Chat) => c.enabled && c.analysis_status === 'running'
+  const enabledCount = chats?.filter((c) => c.enabled && !isAnalyzing(c)).length ?? 0
+  const analyzingCount = chats?.filter(isAnalyzing).length ?? 0
 
   const selectedName = chats?.find((c) => c.chat_id === selectedChatId)?.name ?? null
 
@@ -106,7 +109,11 @@ export default function ChatsPage() {
         <h1>
           채팅방 <MockTag group="chats" />
         </h1>
-        {chats && <span className="muted">자동 답장 켜짐 {enabledCount}개</span>}
+        {chats && (
+          <span className="muted">
+            자동 답장 켜짐 {enabledCount}개{analyzingCount > 0 && ` · 분석 중 ${analyzingCount}개`}
+          </span>
+        )}
       </div>
 
       <input
@@ -134,10 +141,18 @@ export default function ChatsPage() {
       )}
 
       <ul className="chat-list">
-        {chats?.map((chat) => (
+        {chats?.map((chat) => {
+          const analyzing = isAnalyzing(chat)
+          const on = chat.enabled && !analyzing
+          return (
           <li
             key={chat.chat_id}
-            className={['chat-row', chat.enabled && 'on', chat.chat_id === selectedChatId && 'selected']
+            className={[
+              'chat-row',
+              on && 'on',
+              analyzing && 'analyzing',
+              chat.chat_id === selectedChatId && 'selected',
+            ]
               .filter(Boolean)
               .join(' ')}
           >
@@ -149,7 +164,7 @@ export default function ChatsPage() {
               <div className="chat-name">{chat.name}</div>
               <div className="muted chat-meta">
                 마지막 대화 {formatKst(chat.last_message_at)}
-                {chat.enabled && ` · ${chat.reply_delay_sec}초 뒤 답장`}
+                {on && ` · ${chat.reply_delay_sec}초 뒤 답장`}
                 {chat.analysis_status === 'ready' && <span className="chip ready">분신 준비 완료</span>}
                 {chat.analysis_status === 'failed' && <span className="chip failed">기본 답장</span>}
               </div>
@@ -163,20 +178,24 @@ export default function ChatsPage() {
               <button type="button" className="secondary small" onClick={() => setEditing(chat)}>
                 설정
               </button>
-              <label className="switch" title={chat.enabled ? '자동 답장 끄기' : '자동 답장 켜기'}>
+              <label
+                className={analyzing ? 'switch pending' : 'switch'}
+                title={analyzing ? '분석 중 (누르면 끄기)' : on ? '자동 답장 끄기' : '자동 답장 켜기'}
+              >
                 <input
                   type="checkbox"
                   role="switch"
-                  checked={chat.enabled}
+                  checked={on}
                   disabled={toggling.has(chat.chat_id)}
                   onChange={() => toggle(chat)}
-                  aria-label={`${chat.name} 자동 답장`}
+                  aria-label={`${chat.name} 자동 답장${analyzing ? ' (분석 중)' : ''}`}
                 />
                 <span className="slider" />
               </label>
             </div>
           </li>
-        ))}
+          )
+        })}
       </ul>
       </div>
 
