@@ -1,5 +1,6 @@
 // In-memory mock that follows spec 7. Extend freely while the backend is not ready.
 import { ApiError } from './http'
+import { isMocked } from './mockConfig'
 import type { Api } from './real'
 import type { AutoReplySession, Chat, LlmSettings, MeResponse, SessionMessage } from './types'
 
@@ -40,6 +41,8 @@ const sessions: Record<number, AutoReplySession[]> = {
   ],
 }
 
+let nextSessionId = 8
+
 const messages: Record<number, SessionMessage[]> = {
   7: [
     { message_id: 555, sender_name: '김철수', text: '안녕', date: '2026-11-14T01:01:00Z', is_outgoing: false, is_auto_reply: false },
@@ -49,7 +52,8 @@ const messages: Record<number, SessionMessage[]> = {
 }
 
 function requireLogin() {
-  if (!loggedIn) throw new ApiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')
+  // When auth goes to the real backend, the backend cookie decides; mock data is shared.
+  if (isMocked('auth') && !loggedIn) throw new ApiError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')
 }
 
 function findChat(chatId: number): Chat {
@@ -108,7 +112,28 @@ export const mockApi: Api = {
     if (body.reply_delay_sec !== undefined && (body.reply_delay_sec < 30 || body.reply_delay_sec > 120)) {
       throw new ApiError(422, 'VALIDATION_ERROR', '대기 시간은 30~120초입니다.')
     }
-    Object.assign(chat, body)
+    const { enabled, ...rest } = body
+    // Spec 6.1 / 6.3: turning on opens a session, turning off closes it.
+    if (enabled === true && !chat.enabled) {
+      if (!llm.api_key_set) throw new ApiError(400, 'LLM_NOT_CONFIGURED', 'LLM 설정이 필요합니다.')
+      const id = nextSessionId++
+      ;(sessions[chatId] ??= []).unshift({
+        id,
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        message_count: 0,
+        auto_reply_count: 0,
+      })
+      messages[id] = []
+      chat.enabled = true
+      chat.current_session_id = id
+    } else if (enabled === false && chat.enabled) {
+      const open = sessions[chatId]?.find((s) => s.id === chat.current_session_id)
+      if (open) open.ended_at = new Date().toISOString()
+      chat.enabled = false
+      chat.current_session_id = null
+    }
+    Object.assign(chat, rest)
     return { ...chat }
   },
   async sessions(chatId) {

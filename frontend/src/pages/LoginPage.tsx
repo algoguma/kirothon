@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router'
-import { api, ApiError, useMock, type MeResponse } from '../api'
+import { Navigate } from 'react-router'
+import { api, ApiError, isMocked, type MeResponse } from '../api'
 import { errorMessage } from '../api/errors'
 import { useAuth } from '../auth/context'
 
@@ -18,7 +18,6 @@ function normalizePhone(input: string): string {
 // Spec 8 /login: phone -> code -> (optional) 2FA password on one page.
 export default function LoginPage() {
   const { state, setMe } = useAuth()
-  const navigate = useNavigate()
 
   const [step, setStep] = useState<Step>('phone')
   const [apiId, setApiId] = useState('')
@@ -30,12 +29,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  if (state.status === 'authenticated') return <Navigate to="/chats" replace />
-
-  const done = (me: MeResponse) => {
-    setMe(me)
-    navigate(me.llm_configured ? '/chats' : '/setup', { replace: true })
+  // Also handles the redirect right after a successful login (setMe re-renders this page).
+  if (state.status === 'authenticated') {
+    return <Navigate to={state.me.llm_configured ? '/chats' : '/setup'} replace />
   }
+
+  const done = (me: MeResponse) => setMe(me)
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
@@ -190,7 +189,7 @@ export default function LoginPage() {
           {error}
         </p>
       )}
-      {useMock && (
+      {isMocked('auth') && (
         <p className="muted small">
           MOCK: api_hash는 32자리 16진수면 통과, 코드는 아무거나 통과, 00000이면 2단계 인증 화면
         </p>

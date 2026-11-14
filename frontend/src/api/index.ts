@@ -1,9 +1,37 @@
-// All API calls go through this module. Switch with VITE_USE_MOCK in frontend/.env.local.
+// All API calls go through this module. Switch with VITE_USE_MOCK in frontend/.env.local
+// (see mockConfig.ts): "true", "false", or a list of groups such as "llm,chats,sessions".
 import { mockApi } from './mock'
-import { realApi } from './real'
+import { isMocked, mockedGroups, type MockGroup } from './mockConfig'
+import { realApi, type Api } from './real'
 
-export const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
-export const api = useMock ? mockApi : realApi
+const groupOf: Record<keyof Api, MockGroup> = {
+  sendCode: 'auth',
+  signIn: 'auth',
+  password: 'auth',
+  logout: 'auth',
+  me: 'auth',
+  getLlm: 'llm',
+  putLlm: 'llm',
+  chats: 'chats',
+  updateAutoReply: 'chats',
+  sessions: 'sessions',
+  sessionMessages: 'sessions',
+  exportUrl: 'sessions',
+}
 
+export const api = Object.fromEntries(
+  (Object.keys(groupOf) as (keyof Api)[]).map((key) => [
+    key,
+    (isMocked(groupOf[key]) ? mockApi : realApi)[key],
+  ]),
+) as Api
+
+/** True if any group is mocked (shows the MOCK badge). */
+export const useMock = mockedGroups.size > 0
+/** Badge text, e.g. "MOCK" or "MOCK: llm, chats, sessions". */
+export const mockLabel =
+  mockedGroups.size === 4 ? 'MOCK' : `MOCK: ${[...mockedGroups].join(', ')}`
+
+export { isMocked } from './mockConfig'
 export { ApiError } from './http'
 export type * from './types'

@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router'
-import { useMock } from '../api'
+import { mockLabel, useMock } from '../api'
 import { useAuth } from '../auth/context'
 import { SERVICE_NAME } from '../brand'
 
@@ -16,7 +16,7 @@ export function Header() {
           <img src="/favicon.svg" alt="" width={28} height={28} />
           {SERVICE_NAME}
         </Link>
-        {useMock && <span className="mock-badge">MOCK</span>}
+        {useMock && <span className="mock-badge">{mockLabel}</span>}
         <nav className="topbar-nav">
           {loggedIn && (
             <>
