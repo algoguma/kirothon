@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, ApiError, type Chat } from '../../api'
 import { errorMessage } from '../../api/errors'
+import { MockTag } from '../../components/MockTag'
 import { formatKst } from '../../format'
 import { ChatSettingsModal } from './ChatSettingsModal'
 
@@ -65,7 +66,9 @@ export default function ChatsPage() {
   return (
     <main>
       <div className="page-head">
-        <h1>채팅방</h1>
+        <h1>
+          채팅방 <MockTag group="chats" />
+        </h1>
         {chats && <span className="muted">자동 답장 켜짐 {enabledCount}개</span>}
       </div>
 

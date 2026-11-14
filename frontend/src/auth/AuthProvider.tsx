@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setMe = useCallback((me: MeResponse | null) => {
-    setState(me ? { status: 'authenticated', me } : { status: 'anonymous' })
+    setState(me ? { status: 'authenticated', me } : { status: 'anonymous', loggedOut: true })
   }, [])
 
   const value = useMemo(() => ({ state, setMe }), [state, setMe])
