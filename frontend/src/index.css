@@ -18,8 +18,9 @@
   background: var(--bg);
 }
 
+/* Dark palette: follows the OS unless the user picked a theme (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --text: #b4aec8;
     --text-h: #f3f0fa;
     --bg: #141120;
@@ -30,6 +31,21 @@
     --accent-soft: #2a2145;
     --error: #f87171;
   }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --text: #b4aec8;
+  --text-h: #f3f0fa;
+  --bg: #141120;
+  --surface: #1d1930;
+  --border: #2f2947;
+  --accent: #9b6cf0;
+  --accent-hover: #ae88f4;
+  --accent-soft: #2a2145;
+  --error: #f87171;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 body {
@@ -90,6 +106,46 @@ a {
 .topbar-nav a.active {
   color: var(--accent);
   font-weight: 600;
+}
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.icon-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.topbar-nav a.icon-button.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.topbar-nav a,
+.brand {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .topbar-inner,
+  .topbar-nav {
+    gap: 6px;
+  }
+  .brand {
+    font-size: 15px;
+  }
+  .topbar .mock-badge {
+    display: none;
+  }
 }
 .mock-badge {
   padding: 1px 6px;
