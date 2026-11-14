@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link } from 'react-router'
 import {
   api,
   saveFile,
@@ -11,7 +11,7 @@ import { errorMessage } from '../../api/errors'
 import { MockTag } from '../../components/MockTag'
 import { formatKst, formatKstTime } from '../../format'
 
-const POLL_MS = 10_000 // same cadence as /chats
+const POLL_MS = 10_000 // same cadence as the chat list
 
 const FORMATS: { format: ExportFormat; label: string }[] = [
   { format: 'json', label: 'JSON' },
@@ -19,10 +19,15 @@ const FORMATS: { format: ExportFormat; label: string }[] = [
   { format: 'txt', label: 'TXT' },
 ]
 
-// Spec 8 /chats/:chatId/sessions: session list, conversation preview, export downloads.
-export default function SessionsPage() {
-  const chatId = Number(useParams().chatId)
-  const [chatName, setChatName] = useState<string | null>(null)
+interface Props {
+  chatId: number
+  /** From the chat list; null while it is loading or if the chat is not in it. */
+  chatName: string | null
+}
+
+// Right pane of /chats/:chatId (spec 8): session list, conversation preview, export downloads.
+// The parent renders it with key={chatId}, so every chat starts from a clean state.
+export function HistoryPanel({ chatId, chatName }: Props) {
   const [sessions, setSessions] = useState<AutoReplySession[] | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   // Preview result for one session; ignored while it belongs to another selection.
@@ -35,35 +40,29 @@ export default function SessionsPage() {
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<ExportFormat | null>(null)
 
+  // Load now, then every POLL_MS so counts, new sessions and session ends show up.
   useEffect(() => {
-    // There is no single-chat API; take the name from the list.
-    api.chats().then(
-      (list) => setChatName(list.find((c) => c.chat_id === chatId)?.name ?? `채팅방 ${chatId}`),
-      () => setChatName(`채팅방 ${chatId}`),
-    )
-    api.sessions(chatId).then(
-      (list) => {
-        setSessions(list)
-        setSelectedId(list[0]?.id ?? null)
-      },
-      (e: unknown) => setError(errorMessage(e)),
-    )
-  }, [chatId])
-
-  // Refresh the list every POLL_MS so counts, new sessions and session ends show up.
-  useEffect(() => {
-    const timer = setInterval(() => {
+    let cancelled = false
+    const load = (first: boolean) =>
       api.sessions(chatId).then(
         (list) => {
+          if (cancelled) return
           setSessions(list)
           setError(null)
-          // A session appeared while nothing was selected (e.g. auto reply just turned on).
+          // Pick the newest session; also when one appears later (auto reply turned on).
           setSelectedId((id) => id ?? list[0]?.id ?? null)
         },
-        () => {}, // keep showing the last good list; the next tick retries
+        (e: unknown) => {
+          // Keep the last good list on a failed refresh; the next tick retries.
+          if (!cancelled && first) setError(errorMessage(e))
+        },
       )
-    }, POLL_MS)
-    return () => clearInterval(timer)
+    load(true)
+    const timer = setInterval(() => load(false), POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
   }, [chatId])
 
   const selected = sessions?.find((s) => s.id === selectedId) ?? null
@@ -109,13 +108,13 @@ export default function SessionsPage() {
   }
 
   return (
-    <main>
-      <Link to="/chats" className="back-link">
+    <section className="history" aria-label="자동 답장 기록">
+      <Link to="/chats" className="back-link history-back">
         ← 채팅방 목록
       </Link>
-      <h1>
-        {chatName ?? '…'} 자동 답장 기록 <MockTag group="sessions" />
-      </h1>
+      <h2 className="history-title">
+        {chatName ?? `채팅방 ${chatId}`} 자동 답장 기록 <MockTag group="sessions" />
+      </h2>
 
       {error && (
         <p className="error" role="alert">
@@ -128,8 +127,8 @@ export default function SessionsPage() {
       )}
 
       {sessions && sessions.length > 0 && (
-        <div className="sessions-layout">
-          <ul className="session-list">
+        <>
+          <ul className="session-tabs" aria-label="세션">
             {sessions.map((s) => (
               <li key={s.id}>
                 <button
@@ -150,7 +149,7 @@ export default function SessionsPage() {
             ))}
           </ul>
 
-          <section className="preview">
+          <div className="preview">
             {selected && (
               <div className="preview-head">
                 <span className="muted small-inline">
@@ -192,9 +191,9 @@ export default function SessionsPage() {
                 </li>
               ))}
             </ol>
-          </section>
-        </div>
+          </div>
+        </>
       )}
-    </main>
+    </section>
   )
 }
