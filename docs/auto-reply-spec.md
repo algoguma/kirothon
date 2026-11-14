@@ -13,14 +13,14 @@ AI 답장은 개인 클라우드 GPU 서버에서 돌아가는 LLM으로 만든�
 | 포함 | 제외 |
 |---|---|
 | 1:1 개인 대화 | 그룹, 채널, 봇과의 대화 |
-| 여러 사용자, 각자 자기 계정과 자기 LLM API 키 | 한 사용자가 여러 텔레그램 계정을 묶어 관리 |
+| 여러 사용자, 각자 자기 계정·자기 텔레그램 `api_id`/`api_hash`·자기 LLM API 키 | 한 사용자가 여러 텔레그램 계정을 묶어 관리 |
 | AI 생성 답장 | 고정 문구 답장 (AI 실패 시 대체 문구만 사용) |
 | 텍스트 기록 추출 | 사진·파일 등 미디어 추출 |
 | 로컬 실행 | 클라우드 배포, HTTPS 인증서 설정 |
 
 ## 2. 사용자 시나리오
 
-1. 사용자가 관리자 페이지에 접속해 자기 텔레그램 계정으로 로그인한다.
+1. 사용자가 관리자 페이지에 접속해 자기 `api_id`/`api_hash`(https://my.telegram.org 에서 미리 발급)와 전화번호를 입력하고, 자기 텔레그램 계정으로 로그인한다.
 2. 처음 로그인했다면 LLM 연결 정보(API 키 등)를 한 번 입력한다. 서버가 실제로 호출해 보고 저장한다. 다음 로그인부터는 저장된 값이 자동으로 적용된다(3.4).
 3. 1:1 채팅방 목록이 보인다.
 4. 채팅방마다 있는 on/off 토글로 자동 답장을 켠다. 답장 대기 시간(30~120초)과 AI에게 줄 지침(말투, 상황 등)을 정할 수 있다.
@@ -38,19 +38,24 @@ Bot API 봇은 사용자 본인의 개인 대화를 읽거나 사용자 이름�
 
 텔레그램 로그인 위젯(Login Widget)은 "이 사람이 누구인지"만 확인해 줄 뿐, 메시지를 읽고 보낼 수 있는 세션을 주지 않는다. 따라서 관리자 페이지 로그인은 Telethon의 로그인 절차를 웹으로 옮긴 형태가 된다.
 
-1. 사용자가 전화번호 입력 → 백엔드가 그 사용자용 Telethon 클라이언트를 만들고 `client.send_code_request(phone)` 호출
+1. 사용자가 자기 `api_id`, `api_hash`, 전화번호 입력 → 백엔드가 그 값으로 Telethon 클라이언트(`TelegramClient(StringSession(), api_id, api_hash)`)를 만들고 `client.send_code_request(phone)` 호출. `api_id`/`api_hash`가 틀리면 Telethon이 `ApiIdInvalidError`를 던진다.
 2. 텔레그램 앱으로 온 코드 입력 → `client.sign_in(phone, code, phone_code_hash=...)`
 3. 2단계 인증이 걸려 있으면(`SessionPasswordNeededError`) 비밀번호 입력 → `client.sign_in(password=...)`
 4. 성공하면 Telethon 세션(`StringSession`)을 암호화해 DB에 저장하고, 브라우저에는 관리자 페이지용 세션 쿠키를 발급
 
-`API_ID`/`API_HASH`는 이 앱 하나에 대한 값이라 모든 사용자가 같은 값을 쓴다(`.env`). 사용자별로 다른 것은 Telethon 세션과 LLM 설정이다.
+**`api_id`/`api_hash`는 사용자별로 입력받는다.** 강민석이 로그인하면 강민석의 값으로, 김기철이 로그인하면 김기철의 값으로 클라이언트를 만든다. 백엔드 `.env`에는 이 값을 두지 않는다.
+
+- 이 두 값은 "어떤 앱이 접속하는지"를 나타낼 뿐 계정 접근 권한을 주지 않는다. 그래서 값을 입력해도 전화번호 + 인증 코드 로그인은 여전히 필요하다.
+- 사용자는 https://my.telegram.org → "API development tools"에서 앱을 만들어 두 값을 미리 받아 둔다. 자동으로 가져오는 공식 방법은 없다.
+- 로그인에 성공하면 `api_id`와 암호화한 `api_hash`를 Telethon 세션과 함께 `users`에 저장한다. 세션은 그 세션을 만든 `api_id`/`api_hash`로만 다시 연결할 수 있기 때문이다.
+- 로그아웃하면 세션과 함께 지운다. 다시 로그인할 때 다시 입력한다.
 
 ### 3.3 사용자별 Telethon 클라이언트
 
 사용자마다 Telethon 클라이언트가 하나씩 필요하다. 백엔드의 `ClientManager`가 `user_id → TelegramClient`를 관리한다.
 
 - 로그인 성공 시 클라이언트를 등록하고 자동 답장 핸들러를 붙인다.
-- 백엔드 재시작 시 DB에 저장된 세션으로 모든 사용자의 클라이언트를 다시 연결한다.
+- 백엔드 재시작 시 DB에 저장된 사용자별 `api_id`/`api_hash`와 세션으로 모든 사용자의 클라이언트를 다시 연결한다.
 - 로그아웃 시 `client.log_out()`으로 텔레그램 쪽 세션도 끊고, DB의 세션을 지운다.
 - 기존 `session_name.session` 파일 방식은 사용자 한 명만 지원하므로 `StringSession`으로 바꾼다.
 
@@ -162,6 +167,8 @@ kirothon/
 | id | INTEGER PK | |
 | telegram_user_id | INTEGER UNIQUE | 텔레그램 계정 ID |
 | display_name | TEXT | |
+| api_id | INTEGER | 사용자가 입력한 텔레그램 `api_id` |
+| encrypted_api_hash | BLOB | 암호화된 `api_hash` |
 | encrypted_session | BLOB | 암호화된 `StringSession` |
 | created_at | DATETIME (UTC) | |
 
@@ -312,6 +319,7 @@ async def reply_after_delay(user_id, chat_id):
 | 오류 코드 | HTTP | 의미 |
 |---|---|---|
 | `UNAUTHORIZED` | 401 | 로그인 필요 |
+| `INVALID_API_CREDENTIALS` | 400 | `api_id`/`api_hash`가 틀림 (`ApiIdInvalidError`) |
 | `INVALID_CODE` | 400 | 인증 코드가 틀림 |
 | `PASSWORD_REQUIRED` | 401 | 2단계 인증 비밀번호 필요 |
 | `INVALID_PASSWORD` | 400 | 2단계 인증 비밀번호가 틀림 |
@@ -326,11 +334,12 @@ async def reply_after_delay(user_id, chat_id):
 **`POST /api/auth/send-code`**
 ```json
 // 요청
-{ "phone": "+821012345678" }
+{ "api_id": 1234567, "api_hash": "0123456789abcdef0123456789abcdef", "phone": "+821012345678" }
 // 응답 200
 { "login_id": "b3f1c2..." }
+// api_id/api_hash가 틀리면 400 INVALID_API_CREDENTIALS
 ```
-`login_id`는 진행 중인 로그인을 가리키는 임시 ID다. 백엔드는 여기에 Telethon 클라이언트와 `phone_code_hash`를 묶어 메모리에 10분간 보관한다.
+`login_id`는 진행 중인 로그인을 가리키는 임시 ID다. 백엔드는 여기에 Telethon 클라이언트, `api_id`/`api_hash`, `phone_code_hash`를 묶어 메모리에 10분간 보관한다. 로그인에 성공하면 `api_id`/`api_hash`를 `users`에 저장하고, 실패하거나 10분이 지나면 메모리에서 지운다. `api_hash`는 어떤 응답에도 다시 내려주지 않는다.
 
 **`POST /api/auth/sign-in`**
 ```json
@@ -416,7 +425,7 @@ async def reply_after_delay(user_id, chat_id):
 
 | 경로 | 화면 | 사용하는 API |
 |---|---|---|
-| `/login` | 전화번호 → 인증 코드 → (필요 시) 2FA 비밀번호, 한 페이지에서 단계 전환 | `/auth/*` |
+| `/login` | `api_id`·`api_hash`·전화번호 → 인증 코드 → (필요 시) 2FA 비밀번호, 한 페이지에서 단계 전환. 첫 단계에 my.telegram.org 발급 안내 링크 | `/auth/*` |
 | `/setup` | API 키 입력란 하나 + "저장" 버튼(저장 시 연결 확인). `llm_configured: false`면 로그인 직후 여기로 이동 | `/me/llm` |
 | `/chats` | 1:1 채팅방 목록: 이름, 마지막 대화 시각, on/off 토글, 설정 버튼(대기 시간 슬라이더 30~120초, AI 지침, 대체 문구), 오류 표시(`last_error`), 검색창 | `/chats` |
 | `/chats/:chatId/sessions` | 세션 목록(시작·종료 시각, 메시지 수, AI 답장 수), 대화 미리 보기, 형식별 다운로드 버튼 | `/chats/{id}/sessions`, `/sessions/*` |
@@ -427,7 +436,7 @@ async def reply_after_delay(user_id, chat_id):
 
 ## 9. 보안과 운영 주의사항
 
-- **Telethon 세션은 계정 전체 권한과 같다.** 유출되면 누구나 그 계정으로 메시지를 읽고 보낼 수 있다. 세션과 LLM API 키는 Fernet으로 암호화해 저장하고, 암호화 키(`ENCRYPTION_KEY`)는 `.env`에 DB와 분리해 둔다. `.gitignore`에는 이미 `.env`, `*.session`, `*.db`가 들어 있다.
+- **Telethon 세션은 계정 전체 권한과 같다.** 유출되면 누구나 그 계정으로 메시지를 읽고 보낼 수 있다. 세션, 텔레그램 `api_hash`, LLM API 키는 Fernet으로 암호화해 저장하고, 암호화 키(`ENCRYPTION_KEY`)는 `.env`에 DB와 분리해 둔다. `.gitignore`에는 이미 `.env`, `*.session`, `*.db`가 들어 있다.
 - **로컬에서만 연다.** 백엔드는 `127.0.0.1:8000`에만 바인딩한다(`uvicorn --host 127.0.0.1`). 같은 네트워크의 다른 기기에서 접속해야 하면 그때 HTTPS를 적용한다.
 - **GPU 서버 연결**: 로컬 백엔드에서 클라우드 GPU 서버로 가는 요청은 인터넷을 지나간다. vLLM은 반드시 `--api-key`를 켜고 실행해야 한다. 키 없이 띄우면 주소를 아는 누구나 GPU를 쓸 수 있다. vLLM 자체는 HTTPS를 제공하지 않으므로, 가능하면 앞에 nginx나 Caddy를 두어 HTTPS로 연결한다. 해커톤 중 HTTP로 쓴다면 키가 평문으로 오간다는 점을 알고 쓴다.
 - **사용자 간 데이터 분리**: 모든 조회에 `user_id` 조건을 건다. 남의 ID로 요청하면 404가 나오는지 확인한다.
@@ -440,15 +449,13 @@ async def reply_after_delay(user_id, chat_id):
 ### 백엔드 `.env` 항목
 
 ```
-API_ID=...
-API_HASH=...
 ENCRYPTION_KEY=...          # Fernet.generate_key()로 생성
 LLM_BASE_URL=https://...    # GPU 서버의 vLLM 주소 (/v1 앞까지)
 LLM_MODEL=...               # vLLM의 --served-model-name 값
 LLM_TIMEOUT_SEC=30
 ```
 
-API 키는 `.env`에 넣지 않는다. 사용자가 화면에서 입력한다.
+텔레그램 `api_id`/`api_hash`와 LLM API 키는 `.env`에 넣지 않는다. 사용자가 화면에서 입력한다.
 
 ## 10. 구현 순서 (프론트·백엔드 병렬)
 
@@ -456,7 +463,7 @@ API 키는 `.env`에 넣지 않는다. 사용자가 화면에서 입력한다.
 |---|---|---|
 | 0 | 이 문서의 7장 API 형식 확정 (함께) | |
 | 1 | FastAPI 뼈대, DB 모델, Fernet 암호화 | Vite + React 프로젝트, 라우팅, 7장 형식의 목 데이터 |
-| 2 | 웹 로그인 (send-code / sign-in / password), `ClientManager` | 로그인 화면 3단계 |
+| 2 | 웹 로그인 (send-code에 사용자별 `api_id`/`api_hash` / sign-in / password), `ClientManager` | 로그인 화면 3단계 |
 | 3 | `/me/llm` 저장 (`verify_api_key` 호출) | `/setup` 화면 |
 | 4 | 채팅방 목록 (`send.py`의 `iter_dialogs` 재사용, `dialog.is_user`로 필터), on/off와 세션 생성·종료 | 채팅방 목록, 토글, 설정 모달 |
 | 5 | 지연 답장과 메시지 로그 (처음엔 고정 문구로 확인) → `generate_reply`에 GPU 서버 연결 | 오류 표시, 10초 주기 갱신 |
@@ -471,7 +478,8 @@ API 키는 `.env`에 넣지 않는다. 사용자가 화면에서 입력한다.
 | 사용자가 직접 답하면 | 대기 중인 AI 답장 취소 |
 | LLM | 개인 클라우드 GPU 서버의 vLLM, OpenAI 호환 API로 호출 |
 | GPU 서버 주소·모델 | 모든 사용자 공통, 백엔드 `.env`에 설정 |
-| API 키 | 사용자가 첫 로그인 때 한 번 입력, 이후 자동 적용 |
+| 텔레그램 `api_id`/`api_hash` | 사용자가 로그인할 때마다 자기 값을 입력. 로그인 중에는 DB에 암호화 저장, 로그아웃 시 삭제 |
+| LLM API 키 | 사용자가 첫 로그인 때 한 번 입력, 이후 자동 적용 |
 | 실행 환경 | 로컬 PC (프론트 `:5173`, 백엔드 `:8000`) |
 | 구현 분담 | 프론트 React, 백엔드 Python(FastAPI) |
 
