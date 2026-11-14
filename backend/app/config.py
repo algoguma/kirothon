@@ -6,8 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    api_id: int = 0
-    api_hash: str = ""
+    # Telegram api_id/api_hash are entered per user at login (spec 3.2), not configured here.
     encryption_key: str = ""
 
     llm_base_url: str = ""

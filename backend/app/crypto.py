@@ -1,4 +1,4 @@
-"""Fernet encryption for Telethon sessions and LLM API keys."""
+"""Fernet encryption for Telethon sessions, Telegram api_hash and LLM API keys."""
 
 from functools import lru_cache
 
@@ -15,9 +15,15 @@ def _fernet() -> Fernet:
     return Fernet(key)
 
 
+def check_key() -> None:
+    """Raise if ENCRYPTION_KEY is missing or malformed."""
+    _fernet()
+
+
 def encrypt(plain: str) -> bytes:
     return _fernet().encrypt(plain.encode())
 
 
-def decrypt(token: bytes) -> str:
-    return _fernet().decrypt(token).decode()
+def decrypt(token: bytes, ttl: int | None = None) -> str:
+    """Raise cryptography.fernet.InvalidToken if tampered or older than `ttl` seconds."""
+    return _fernet().decrypt(token, ttl=ttl).decode()
