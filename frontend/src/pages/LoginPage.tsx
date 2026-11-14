@@ -22,6 +22,8 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   const [step, setStep] = useState<Step>('phone')
+  const [apiId, setApiId] = useState('')
+  const [apiHash, setApiHash] = useState('')
   const [phone, setPhone] = useState('')
   const [loginId, setLoginId] = useState('')
   const [code, setCode] = useState('')
@@ -51,7 +53,11 @@ export default function LoginPage() {
   const submitPhone = (e: FormEvent) => {
     e.preventDefault()
     void run(async () => {
-      const res = await api.sendCode(normalizePhone(phone))
+      const res = await api.sendCode({
+        api_id: Number(apiId.trim()),
+        api_hash: apiHash.trim(),
+        phone: normalizePhone(phone),
+      })
       setLoginId(res.login_id)
       setCode('')
       setStep('code')
@@ -91,18 +97,50 @@ export default function LoginPage() {
 
       {step === 'phone' && (
         <form onSubmit={submitPhone}>
+          <p className="muted small">
+            <a href="https://my.telegram.org/apps" target="_blank" rel="noreferrer">
+              my.telegram.org
+            </a>
+            {' '}→ API development tools에서 앱을 만들고 api_id와 api_hash를 받아 오세요. 로그인할
+            때마다 입력합니다.
+          </p>
+          <label>
+            api_id
+            <input
+              inputMode="numeric"
+              autoFocus
+              required
+              pattern="[0-9]+"
+              placeholder="1234567"
+              value={apiId}
+              onChange={(e) => setApiId(e.target.value)}
+            />
+          </label>
+          <label>
+            api_hash
+            <input
+              type="password"
+              autoComplete="off"
+              required
+              pattern="[0-9a-fA-F]{32}"
+              title="32자리 16진수"
+              value={apiHash}
+              onChange={(e) => setApiHash(e.target.value)}
+            />
+          </label>
           <label>
             전화번호
             <input
               type="tel"
-              autoFocus
               required
               placeholder="010-1234-5678"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
           </label>
-          <button disabled={busy || !phone.trim()}>인증 코드 받기</button>
+          <button disabled={busy || !apiId.trim() || !apiHash.trim() || !phone.trim()}>
+            인증 코드 받기
+          </button>
         </form>
       )}
 
@@ -153,7 +191,11 @@ export default function LoginPage() {
           {error}
         </p>
       )}
-      {useMock && <p className="muted small">MOCK: 아무 코드나 통과, 코드 00000이면 2단계 인증 화면</p>}
+      {useMock && (
+        <p className="muted small">
+          MOCK: api_hash는 32자리 16진수면 통과, 코드는 아무거나 통과, 00000이면 2단계 인증 화면
+        </p>
+      )}
     </main>
   )
 }

@@ -5,6 +5,7 @@ export type IsoDate = string
 
 export type ErrorCode =
   | 'UNAUTHORIZED'
+  | 'INVALID_API_CREDENTIALS'
   | 'INVALID_CODE'
   | 'PASSWORD_REQUIRED'
   | 'INVALID_PASSWORD'
@@ -20,6 +21,8 @@ export interface ErrorBody {
 
 // 7.1 Auth
 export interface SendCodeRequest {
+  api_id: number
+  api_hash: string
   phone: string
 }
 export interface SendCodeResponse {

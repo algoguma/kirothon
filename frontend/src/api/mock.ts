@@ -59,8 +59,11 @@ function findChat(chatId: number): Chat {
 }
 
 export const mockApi: Api = {
-  async sendCode() {
+  async sendCode({ api_hash }) {
     await delay()
+    if (!/^[0-9a-f]{32}$/i.test(api_hash)) {
+      throw new ApiError(400, 'INVALID_API_CREDENTIALS', 'api_id 또는 api_hash가 올바르지 않습니다.')
+    }
     return { login_id: 'mock-login' }
   },
   async signIn(_loginId, code) {
