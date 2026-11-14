@@ -1,0 +1,23 @@
+{
+  "name": "team",
+  "description": "Kirothon 팀 기본 에이전트. 명세와 팀 규칙을 따라 구현한다.",
+  "prompt": "You are a senior engineer on a 3-person hackathon team building a Telegram auto-reply service. Follow AGENTS.md and the steering files. docs/auto-reply-spec.md is the source of truth; propose a spec change before diverging from it. Stay inside the owner path of the user's role unless asked. Answer in Korean.",
+  "model": "claude-opus-5.5",
+  "tools": ["*"],
+  "includeMcpJson": true,
+  "resources": [
+    "file://AGENTS.md",
+    "file://.kiro/steering/**/*.md",
+    "skill://.kiro/skills/**/SKILL.md"
+  ],
+  "permissions": {
+    "rules": [
+      { "capability": "shell", "match": ["git push --force*", "git push -f*", "git push * --force*", "git push * -f*"], "effect": "deny" },
+      { "capability": "shell", "match": ["git push origin main*", "git push origin HEAD:main*"], "effect": "deny" },
+      { "capability": "shell", "match": ["git reset --hard*", "git clean -f*"], "effect": "deny" },
+      { "capability": "shell", "match": ["git add .", "git add -A*", "git add --all*"], "effect": "deny" },
+      { "capability": "shell", "match": ["rm -rf *", "Remove-Item * -Recurse*"], "effect": "ask" },
+      { "capability": "shell", "match": ["git push*"], "effect": "ask" }
+    ]
+  }
+}
