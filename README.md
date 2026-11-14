@@ -105,7 +105,7 @@
 ## 구조
 
 ```
-frontend/              React 화면 (로그인, 채팅방 목록, 세션 기록, 설정)
+frontend/              React 화면 (메인, 로그인, 채팅방 목록·기록 2분할, 설정)
 backend/app/
   api/                 auth, me, chats, sessions 라우터
   telegram/            ClientManager, 자동 답장 디바운스, 말풍선 전송, 주인 알림
@@ -117,7 +117,9 @@ docs/auto-reply-spec.md  기능 명세 (API 계약 포함)
 
 자세한 동작과 API 형식은 [기능 명세](docs/auto-reply-spec.md), 팀 역할과 작업 규칙은 [AGENTS.md](AGENTS.md)를 봅니다.
 
-## 실행 (Windows PowerShell)
+## 실행
+
+### Windows PowerShell
 
 필요: Python 3.11+, Node.js LTS. PowerShell에서 `npm`이 실행 정책 오류를 내면 `npm.cmd`를 씁니다.
 
@@ -145,11 +147,34 @@ Copy-Item .env.example .env
 ```powershell
 cd frontend
 npm.cmd install
-Copy-Item .env.example .env.local   # VITE_USE_MOCK=false면 실제 백엔드, true면 mock
+Copy-Item .env.example .env.local   # 기본값은 VITE_USE_MOCK=true(mock). 실제 백엔드를 쓰려면 false로 바꾼다
 npm.cmd run dev
 ```
 - `VITE_USE_MOCK`은 `true`, `false`, 또는 mock으로 쓸 그룹 목록(`auth`, `chats`, `sessions`)입니다.
 - 린트와 빌드: `npm.cmd run lint`, `npm.cmd run build`
+
+### macOS / Linux
+
+명령만 다르고 순서와 `.env` 값은 같습니다.
+
+```bash
+# 1. GPU 서버 터널 (별도 터미널)
+ssh -N -L 8000:localhost:8000 <user>@<GPU 서버>
+
+# 2. 백엔드 (새 터미널, 저장소 루트에서)
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+
+# 3. 프론트엔드 (새 터미널, 저장소 루트에서)
+cd frontend
+npm install
+cp .env.example .env.local   # 실제 백엔드를 쓰려면 VITE_USE_MOCK=false
+npm run dev
+```
 
 ## 보안과 주의
 
@@ -167,4 +192,4 @@ npm.cmd run dev
 | Backend | 로그인, ClientManager, 채팅방·세션·추출 API, 자동 답장 (`backend/`) |
 | AI | 말투·기억 분석, 답장 프롬프트, 판단기, vLLM 서버 (`backend/app/ai/`, `prototype/`) |
 
-이 저장소는 Kiro 설정(`.kiro/`)을 공유합니다. 저장소 루트에서 `kiro-cli`를 실행하면 `team` 에이전트와 `claude-opus-5.5` 모델이 적용됩니다. PR은 `/pr`, 머지 전 셀프 리뷰는 `kiro-cli --agent reviewer`.
+이 저장소는 Kiro 설정(`.kiro/`)을 공유합니다. kiro-cli 3.x가 필요합니다(`kiro-cli --version`으로 확인). 저장소 루트에서 `kiro-cli`를 실행하면 `team` 에이전트와 `claude-opus-5.5` 모델이 적용됩니다. PR은 `/pr`, 머지 전 셀프 리뷰는 `kiro-cli --agent reviewer`.

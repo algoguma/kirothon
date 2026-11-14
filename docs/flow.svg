@@ -29,7 +29,7 @@
   <text x="370" y="142" class="hd">🖥 Frontend</text>
   <text x="370" y="172" class="t">React + Vite + TS</text>
   <text x="370" y="196" class="t">localhost:5173</text>
-  <text x="370" y="220" class="s">로그인 · 채팅방 · 세션 화면</text>
+  <text x="370" y="220" class="s">메인 · 로그인 · 채팅방·기록 · 설정</text>
   <text x="370" y="244" class="s">/api → Vite 프록시</text>
 
   <rect class="box" x="660" y="110" width="500" height="150"/>
@@ -74,9 +74,10 @@
   <text x="872" y="540" class="tag">SSH 터널</text>
 
   <!-- Reply timeline -->
-  <rect class="box" x="40" y="570" width="470" height="130"/>
+  <rect class="box" x="40" y="570" width="470" height="154"/>
   <text x="60" y="602" class="hd">⏱ 답장 타임라인</text>
   <text x="60" y="632" class="t">상대 메시지 → 대기 5~120초 (새 메시지 오면 재시작)</text>
-  <text x="60" y="656" class="t">→ 판단 + 답장 생성 → 말풍선 전송 (1.2초 간격)</text>
-  <text x="60" y="680" class="t">→ 필요하면 5초 뒤 나에게 알림 · 실패 시 대체 문구</text>
+  <text x="60" y="656" class="t">→ 말투·기억 분석 중이면 끝날 때까지 기다림</text>
+  <text x="60" y="680" class="t">→ 판단 + 답장 생성 → 말풍선 전송 (1.2초 간격)</text>
+  <text x="60" y="704" class="t">→ 필요하면 5초 뒤 나에게 알림 · 실패 시 대체 문구</text>
 </svg>
