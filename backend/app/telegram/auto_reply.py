@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 REPLY_HISTORY_LIMIT = 160  # persona prompt uses the last 150 + the new messages
 ANALYSIS_HISTORY_LIMIT = 1000  # style/memory analysis input on ON
+MAX_BUBBLES = 5  # a reply line becomes one Telegram message; cap to avoid spam
+BUBBLE_GAP_SEC = 1.2  # pause between bubbles so it reads like typing
 
 Key = tuple[int, int]  # (user_id, chat_id)
 
@@ -76,6 +78,8 @@ class AutoReplier:
         self._sent_ids: set[tuple[int, int, int]] = set()
         self._me: dict[int, str] = {}  # user_id -> own display name
         self._analysis: dict[Key, asyncio.Task[None]] = {}
+        self._bursting: set[Key] = set()  # chats whose reply bubbles are being sent
+        self._interrupted: set[Key] = set()  # the user replied personally mid-burst
 
     def attach(self, user_id: int, client: TelegramClient, me_name: str) -> None:
         self._me[user_id] = me_name
@@ -188,8 +192,11 @@ class AutoReplier:
             return
         if self._sending.get(key) == msg.message:
             return  # echo of the auto reply that is still being sent
-        # The user answered personally: drop the pending AI reply (before any await).
+        # The user answered personally: drop the pending AI reply (before any await)
+        # and stop the remaining bubbles of a reply that is being sent.
         self.cancel(*key)
+        if key in self._bursting:
+            self._interrupted.add(key)
         await save_message(
             user_id, event.chat_id, session_id, msg, self._me.get(user_id, "나"), False
         )
@@ -225,22 +232,40 @@ class AutoReplier:
             if self._pending.get(key) is asyncio.current_task():
                 # From here on a user reply or a new message must not cancel a half-sent reply.
                 del self._pending[key]
-            if text:
-                self._sending[key] = text
-                try:
-                    sent = await client.send_message(chat_id, text)
-                finally:
-                    self._sending.pop(key, None)
-                self._sent_ids.add((user_id, chat_id, sent.id))
-                await save_message(
-                    user_id, chat_id, session_id, sent, self._me.get(user_id, "나"), True
-                )
+            await self._send_bubbles(key, client, session_id, text)
             await self._set_last_error(key, error)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             logger.warning("Auto reply failed for user %s: %s", user_id, type(exc).__name__)
             await self._set_last_error(key, "자동 답장을 보내지 못했습니다.")
+
+    async def _send_bubbles(
+        self, key: Key, client: TelegramClient, session_id: int, text: str
+    ) -> None:
+        """Send each line as its own message, like chat bubbles (prototype reply_lines)."""
+        user_id, chat_id = key
+        lines = [line.strip() for line in text.splitlines() if line.strip()][:MAX_BUBBLES]
+        self._interrupted.discard(key)
+        self._bursting.add(key)
+        try:
+            for i, line in enumerate(lines):
+                if i > 0:
+                    await asyncio.sleep(BUBBLE_GAP_SEC)
+                    if self._session_for(*key) != session_id or key in self._interrupted:
+                        return  # turned off, or the user started typing back personally
+                self._sending[key] = line
+                try:
+                    sent = await client.send_message(chat_id, line)
+                finally:
+                    self._sending.pop(key, None)
+                self._sent_ids.add((user_id, chat_id, sent.id))
+                await save_message(
+                    user_id, chat_id, session_id, sent, self._me.get(user_id, "나"), True
+                )
+        finally:
+            self._bursting.discard(key)
+            self._interrupted.discard(key)
 
     async def _history(
         self, user_id: int, client: TelegramClient, chat_id: int, limit: int
