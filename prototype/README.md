@@ -49,6 +49,7 @@
 | `boyfriend/checker.py` | 메시지마다 Qwen3.8로 🚨비상상황 / ❓주인 확인 필요 판단 (JSON) |
 | `boyfriend/persona.py` | style.md와 memory.md를 프롬프트로 남자친구 대화, 판단 결과에 따라 톤 조절/보류, 주인 답변 전달 및 기억 저장 |
 | `boyfriend/llm.py` | vLLM OpenAI 호환 API 클라이언트 (thinking 모드 제어, JSON 모드) |
+| `boyfriend/tunnel.py` | `.env`의 `SSH_TUNNEL`로 vLLM 서버 SSH 터널 자동 연결/종료 |
 | `run.py` / `run.sh` | **해커톤 실행 파일**: 대화 파일(txt/JSON) + 내 이름 + 상대 메시지 → JSON |
 | `main.py` | 터미널 챗봇 |
 | `app.py` | Gradio 웹 데모 (md 확인, 수정, 적용 가능) |
@@ -63,10 +64,9 @@ bash server/serve.sh      # Qwen3.8-27B → 127.0.0.1:8000
 
 ### 2. 로컬
 ```bash
-ssh -N -L 8000:localhost:8000 <user>@<server>   # 터널 (별도 터미널)
 
 pip install -r requirements.txt
-cp .env.example .env   # 필요시 수정 (기본값으로도 동작)
+cp .env.example .env   # SSH_TUNNEL=<user>@<server> 설정 → 실행 시 터널 자동 연결
 
 # 웹 데모
 python app.py          # http://localhost:7860
@@ -112,6 +112,7 @@ print(send("나 오늘 엽떡 먹었어")["reply"])
 print(send("내가 뭐 먹었다고 했지?")["reply"])   # 앞 대화를 기억해요
 ```
 - 처음 실행할 때만 말투/기억을 분석해요 (약 2분, `output/<파일>_<내이름>/`에 저장). 이후에는 바로 답해요. 새로 분석하려면 `--reanalyze`를 붙이세요.
+- 설정 파일은 `--env 경로`로 지정할 수 있어요 (기본: 프로젝트 폴더의 `.env`). 예) `./run.sh --env ~/secrets/kirothon.env --talk Talk.txt --me 홍길동`. 지정한 파일이 없으면 `{"error": ...}`를 출력해요.
 - **stdout에는 JSON만** 출력하고, 진행 로그는 stderr로 보내요. 보기 좋게 출력하려면 `--pretty`를 붙이세요.
 - `run.sh`는 어느 폴더에서 실행해도 돼요 (`.venv`가 있으면 사용). `python run.py ...`로 실행해도 같아요.
 
@@ -136,6 +137,17 @@ print(send("내가 뭐 먹었다고 했지?")["reply"])   # 앞 대화를 기억
 | `needs_confirmation.question` | 나(주인)에게 물어볼 질문 |
 | `error` | 실패 시에만 (예: 대화에 없는 이름). 종료 코드 1 |
 
+### SSH 자동 터널
+`.env`에 `SSH_TUNNEL`을 넣어두면 `run.sh`, `app.py`, `main.py`를 실행할 때 vLLM 서버로 가는 터널(`ssh -N -L 8000:localhost:8000 ...`)을 자동으로 열고, 끝나면 닫아요. 터미널을 따로 띄울 필요가 없어요.
+```bash
+# .env (GitHub에 올라가지 않음)
+SSH_TUNNEL=<user>@<server>
+SSH_KEY=~/.ssh/kirothon     # (선택) 키 파일. 없으면 실행할 때 SSH 비밀번호를 물어봐요
+```
+- `localhost:8000`이 이미 열려 있으면(터널을 직접 열어둔 경우) 그대로 써요.
+- stdout(JSON)은 깨끗하게 유지되고, 터널 로그와 비밀번호 입력은 stderr와 터미널로 처리돼요.
+- 서버 접속 정보는 `.env`에만 두고 저장소에는 올리지 마세요. 외부에 공유할 때는 비밀번호 대신 **포트 포워딩만 되는 전용 키**를 쓰세요 (`authorized_keys`에 `restrict,port-forwarding,permitopen="localhost:8000",command="/bin/false"` 옵션).
+
 ### 환경변수 (.env)
 | 이름 | 기본값 | 설명 |
 |---|---|---|
@@ -146,6 +158,9 @@ print(send("내가 뭐 먹었다고 했지?")["reply"])   # 앞 대화를 기억
 | `MEMORY_CHUNK` | `250` | 기억 추출 구간 크기 |
 | `RECENT_RAW` | `150` | 대화할 때 프롬프트에 넣을 최근 원문 메시지 수 |
 | `OUTPUT_DIR` | `output` | md 저장 위치 |
+| `SSH_TUNNEL` | (없음) | `user@server` 설정 시 SSH 터널 자동 연결 |
+| `SSH_KEY` | (없음) | 터널용 키 파일 (없으면 비밀번호 입력) |
+| `SSH_PORT` / `SSH_REMOTE_PORT` | `22` / `8000` | SSH 포트 / 서버의 vLLM 포트 |
 
 ## 설계 포인트
 - **학습 없이 프롬프트만 사용**: 말투 분석, 기억 추출, 대화를 전부 Qwen3.8 하나로 처리합니다.

@@ -11,15 +11,30 @@
   # 표준입력: 한 줄에 메시지 1개 → 한 줄에 JSON 1개 (JSONL). 켜져 있는 동안 대화를 기억/참조, /reset 으로 초기화
   echo "오빠 뭐해??" | python run.py --talk Talk.txt --me 홍길동
 
+  # 설정 파일 지정 (기본: 프로젝트 폴더의 .env)
+  python run.py --env ~/secrets/kirothon.env --talk Talk.txt --me 홍길동 -m "오빠 뭐해??"
+
 - 처음 실행 시 Qwen3.8이 말투/기억을 분석해 output/<파일>_<내이름>/에 저장 (약 2분), 이후에는 바로 불러옴
 - stdout에는 JSON만 출력, 진행 로그는 stderr
 """
 import argparse
 import json
+import os
 import sys
 
-from boyfriend import analyze, config, default_out_dir, has_saved, load_boyfriend, load_kakao, speakers
-from boyfriend import llm
+# --env는 설정(config)이 import될 때 읽히므로, boyfriend를 불러오기 전에 먼저 처리
+_pre = argparse.ArgumentParser(add_help=False)
+_pre.add_argument("--env")
+_env_arg = _pre.parse_known_args()[0].env
+if _env_arg:
+    os.environ["KIROTHON_ENV"] = os.path.abspath(os.path.expanduser(_env_arg))  # 실행 위치 기준 상대경로 허용
+
+try:
+    from boyfriend import analyze, config, default_out_dir, has_saved, load_boyfriend, load_kakao, speakers
+    from boyfriend import llm
+except FileNotFoundError as e:  # --env로 지정한 파일이 없음
+    print(json.dumps({"error": f"FileNotFoundError: {e}"}, ensure_ascii=False), flush=True)
+    sys.exit(1)
 
 
 def log(*a):
@@ -71,7 +86,10 @@ def main():
     ap.add_argument("--limit", type=int, default=config.MAX_MESSAGES, help="앞에서부터 사용할 메시지 수")
     ap.add_argument("--reanalyze", action="store_true", help="저장된 분석 무시하고 새로 분석")
     ap.add_argument("--pretty", action="store_true", help="JSON 들여쓰기")
+    ap.add_argument("--env", default=config.DEFAULT_ENV,
+                    help=f"설정(.env) 파일 경로 (기본: {config.DEFAULT_ENV})")
     args = ap.parse_args()
+    log(f"[설정] {config.ENV_FILE}" + ("" if os.path.exists(config.ENV_FILE) else " (없음 → 기본값 사용)"))
     indent = 2 if args.pretty else None
 
     def emit(obj):
@@ -85,8 +103,15 @@ def main():
         sys.exit(1)
 
     if args.message:  # 인자로 받은 메시지
-        results = [respond(bf, m) for m in args.message]
+        results = []
+        for m in args.message:
+            try:
+                results.append(respond(bf, m))
+            except Exception as e:
+                results.append({"input": m, "error": f"{type(e).__name__}: {e}"})
         emit(results[0] if len(results) == 1 else results)
+        if any("error" in r for r in results):
+            sys.exit(1)
     else:  # 표준입력 JSONL 모드: 프로세스가 켜져 있는 동안 대화를 기억하고 참조 (최근 30턴)
         if sys.stdin.isatty():
             log("상대 메시지를 한 줄씩 입력하세요. 대화는 계속 이어집니다. (/reset 초기화, Ctrl+D 종료)")
