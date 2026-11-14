@@ -86,11 +86,15 @@ async def generate_reply(api_key: str, history: list[ChatMessage], instructions:
         # No partner message to respond to.
         raise LLMError("답장을 만들 대화가 없습니다.")
     try:
+        # Qwen3 defaults to thinking mode: slow, and emits  tags that break the
+        # 30s budget and the short-reply goal. Off by default; chat templates that
+        # do not reference enable_thinking simply ignore it.
         resp = await _client(api_key).chat.completions.create(
             model=settings.llm_model,
             messages=messages,
             temperature=0.7,
             max_tokens=300,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
     except APITimeoutError as exc:
         raise LLMError("LLM 호출 시간 초과") from exc
