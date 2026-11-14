@@ -10,6 +10,8 @@ from app.crypto import decrypt
 from app.db import SessionLocal
 from app.errors import ApiError
 from app.models import ChatSettings, User
+from app.telegram.auto_reply import AutoReplier
+from app.telegram.entities import display_name
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ class ClientManager:
         self._clients: dict[int, TelegramClient] = {}
         # user_id -> {chat_id: current session_id}; avoids a DB lookup per message.
         self._enabled: dict[int, dict[int, int]] = {}
+        self._auto = AutoReplier(self.session_for)
 
     async def start(self) -> None:
         """Reconnect every user with a saved session and load enabled chats."""
@@ -53,16 +56,18 @@ class ClientManager:
                 logger.warning("Saved session for user %s is no longer authorized", user_id)
                 await client.disconnect()
                 return
+            me = await client.get_me()
         except Exception as exc:
             # Never log the exception text; it may echo connection details.
             logger.warning("Could not connect client for user %s: %s", user_id, type(exc).__name__)
             await client.disconnect()
             return
-        self._on_connected(user_id, client)
+        self._auto.attach(user_id, client, display_name(me))
         self._clients[user_id] = client
         logger.info("Telegram client connected for user %s", user_id)
 
     async def remove_user(self, user_id: int) -> None:
+        self._auto.cancel_user(user_id)
         self._enabled.pop(user_id, None)
         client = self._clients.pop(user_id, None)
         if client is not None:
@@ -79,9 +84,10 @@ class ClientManager:
 
     def disable(self, user_id: int, chat_id: int) -> None:
         self._enabled.get(user_id, {}).pop(chat_id, None)
+        self._auto.cancel(user_id, chat_id)
 
-    def _on_connected(self, user_id: int, client: TelegramClient) -> None:
-        """Hook for event handlers (auto reply)."""
+    def session_for(self, user_id: int, chat_id: int) -> int | None:
+        return self._enabled.get(user_id, {}).get(chat_id)
 
 
 client_manager = ClientManager()

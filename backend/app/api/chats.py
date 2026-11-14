@@ -12,6 +12,7 @@ from telethon.tl.types import User as TgUser
 from app.api.deps import CurrentUser, DbSession
 from app.errors import ApiError
 from app.models import AutoReplySession, ChatSettings, utc_now
+from app.telegram.entities import display_name, is_private_user
 from app.telegram.manager import client_manager
 from app.timeutil import iso_utc
 
@@ -37,16 +38,6 @@ class AutoReplyUpdate(BaseModel):
     reply_delay_sec: int | None = Field(default=None, ge=30, le=120)
     ai_instructions: str | None = Field(default=None, max_length=2000)
     fallback_text: str | None = Field(default=None, max_length=1000)
-
-
-def is_private_user(entity: object) -> bool:
-    # Spec scope: 1:1 chats only; no bots, no "Saved Messages".
-    return isinstance(entity, TgUser) and not entity.bot and not entity.is_self
-
-
-def display_name(entity: TgUser) -> str:
-    name = " ".join(part for part in (entity.first_name, entity.last_name) if part)
-    return name or entity.username or str(entity.id)
 
 
 def _chat_out(
