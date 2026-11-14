@@ -4,14 +4,15 @@ import re
 
 from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import SESSION_COOKIE, SESSION_MAX_AGE_SEC, CurrentUser, DbSession
 from app.api.me import MeResponse, build_me
 from app.crypto import decrypt, encrypt
-from app.models import User
+from app.models import AutoReplySession, ChatSettings, User, utc_now
 from app.telegram.login import LoginResult, log_out_session, login_manager
+from app.telegram.manager import client_manager
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -66,7 +67,19 @@ async def password(body: PasswordRequest, response: Response, db: DbSession) -> 
 
 @router.post("/logout", status_code=204)
 async def logout(user: CurrentUser, db: DbSession, response: Response) -> None:
-    # TODO(Backend): once ClientManager exists, stop this user's live client here as well.
+    await client_manager.remove_user(user.id)
+    # Auto reply cannot run without a session, so close any open auto-reply sessions.
+    now = utc_now()
+    await db.execute(
+        update(AutoReplySession)
+        .where(AutoReplySession.user_id == user.id, AutoReplySession.ended_at.is_(None))
+        .values(ended_at=now)
+    )
+    await db.execute(
+        update(ChatSettings)
+        .where(ChatSettings.user_id == user.id, ChatSettings.enabled)
+        .values(enabled=False, current_session_id=None)
+    )
     if user.api_id and user.encrypted_api_hash and user.encrypted_session:
         await log_out_session(
             user.api_id, decrypt(user.encrypted_api_hash), decrypt(user.encrypted_session)
@@ -88,6 +101,7 @@ async def _complete_login(db: AsyncSession, response: Response, result: LoginRes
     user.encrypted_api_hash = encrypt(result.api_hash)
     user.encrypted_session = encrypt(result.session)
     await db.commit()
+    await client_manager.add_user(user.id, result.api_id, result.api_hash, result.session)
 
     # Cookie value is a Fernet token of the user id: tamper-proof and expires with ttl.
     response.set_cookie(
@@ -98,4 +112,4 @@ async def _complete_login(db: AsyncSession, response: Response, result: LoginRes
         samesite="lax",
         path="/",
     )
-    return await build_me(db, user)
+    return build_me(user)

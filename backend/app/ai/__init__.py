@@ -41,15 +41,16 @@ _BASE_INSTRUCTIONS = (
 _HISTORY_LIMIT = 20
 
 
-def _client(api_key: str) -> AsyncOpenAI:
+def _client() -> AsyncOpenAI:
     settings = get_settings()
     base_url = (settings.llm_base_url or "").rstrip("/")
     if not base_url:
         raise LLMError("LLM_BASE_URL이 설정되지 않았습니다.")
-    # Spec 3.4: backend appends "/v1" to LLM_BASE_URL.
+    # Spec 3.4: backend appends "/v1" to LLM_BASE_URL. vLLM runs without --api-key behind
+    # an SSH tunnel, but the openai client requires some key value.
     return AsyncOpenAI(
         base_url=base_url + "/v1",
-        api_key=api_key or "EMPTY",
+        api_key="EMPTY",
         timeout=settings.llm_timeout_sec,
     )
 
@@ -73,7 +74,7 @@ def _system_prompt(instructions: str) -> str:
     return system
 
 
-async def generate_reply(api_key: str, history: list[ChatMessage], instructions: str) -> str:
+async def generate_reply(history: list[ChatMessage], instructions: str) -> str:
     """Return a reply for the latest messages in `history` (oldest first)."""
     if get_settings().llm_use_stub:
         return "[stub] 지금은 답장이 어려워요. 나중에 연락드릴게요."
@@ -89,7 +90,7 @@ async def generate_reply(api_key: str, history: list[ChatMessage], instructions:
         # Qwen3 defaults to thinking mode: slow, and emits  tags that break the
         # 30s budget and the short-reply goal. Off by default; chat templates that
         # do not reference enable_thinking simply ignore it.
-        resp = await _client(api_key).chat.completions.create(
+        resp = await _client().chat.completions.create(
             model=settings.llm_model,
             messages=messages,
             temperature=0.7,
@@ -111,22 +112,4 @@ async def generate_reply(api_key: str, history: list[ChatMessage], instructions:
     return text
 
 
-async def verify_api_key(api_key: str) -> None:
-    """Check the key with GET {LLM_BASE_URL}/v1/models. Raise LLMError on failure."""
-    if get_settings().llm_use_stub:
-        if not api_key:
-            raise LLMError("empty api key")
-        return
-    try:
-        await _client(api_key).models.list()
-    except APITimeoutError as exc:
-        raise LLMError("LLM 연결 시간 초과") from exc
-    except APIConnectionError as exc:
-        raise LLMError("LLM 서버에 연결할 수 없습니다") from exc
-    except APIStatusError as exc:
-        raise LLMError(f"LLM 키 확인 실패 (HTTP {exc.status_code})") from exc
-    except APIError as exc:
-        raise LLMError(f"LLM 키 확인 실패: {exc.__class__.__name__}") from exc
-
-
-__all__ = ["ChatMessage", "LLMError", "generate_reply", "verify_api_key"]
+__all__ = ["ChatMessage", "LLMError", "generate_reply"]
